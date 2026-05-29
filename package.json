@@ -1,0 +1,37 @@
+{
+    "name": "alice",
+    "version": "1.0.0",
+    "description": "Alice's _____",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder"
+    },
+    "dependencies": {
+        "electron-log": "^5.4.3",
+        "electron-prompt": "^1.7.0",
+        "electron-store": "^10.1.0"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^25.0.0",
+        "electron-builder": "^26.0.12"
+    },
+    "build": {
+        "appId": "com.dasoops",
+        "productName": "Alice",
+        "copyright": "Copyright © 2025",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.js",
+            "assets/**/*"
+        ],
+        "win": {
+            "target": "nsis"
+        }
+    }
+}
