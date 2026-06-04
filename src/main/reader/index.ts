@@ -58,9 +58,8 @@ export class Reader {
     this.conf.onDidChange('file', async (newValue) => {
       if (!newValue) throw Error('unexpected')
       // clear
-      this.begin = undefined
-      this.end = undefined
       this.cachePath = undefined
+      this.conf.set('index', 0)
       this.content = await this.init0(newValue as string)
       this.mainWindow.webContents.send('refresh-content')
     })
@@ -127,22 +126,26 @@ export class Reader {
     return result()
   }
 
-  private begin?: number
-  private end?: number
-
   async read(offset: number): Promise<string> {
     await this.initlization
     const { chunkSize, index, maxLine } = this.conf.store
     const contentLength = this.content!.length
-    const sign = offset === 0 ? 1 : Math.sign(offset)
     log.debug(`Reader ==> index: ${index}`)
 
-    const nextPage = (index: number): number => {
+    const nextPage = (
+      index: number,
+      option?: { offset?: number; maxLine?: number; chunkSize?: number }
+    ): number => {
+      const offset0 = option?.offset ?? offset
+      const maxLine0 = option?.maxLine ?? maxLine
+      const chunkSize0 = option?.chunkSize ?? chunkSize
+
+      const sign = offset0 === 0 ? 1 : Math.sign(offset0)
       let pageIndex = index
       let line = 0
       while (true) {
-        if (line >= maxLine) break
-        if (Math.abs(pageIndex - index) >= chunkSize) break
+        if (line >= maxLine0) break
+        if (Math.abs(pageIndex - index) >= chunkSize0) break
         const target = pageIndex + sign
         if (target < 0 || target > contentLength) break
         pageIndex = target
@@ -154,33 +157,36 @@ export class Reader {
     }
 
     // 指针为当前页文本头部, 初始化当前页 起始/结束索引
-    if (undefined === this.begin && undefined === this.end) {
-      this.begin = index
-      this.end = nextPage(index)
-      log.info(`Reader ==> init index: ${index}, ${this.begin}..${this.end}`)
-    }
-
+    let begin: number, end: number
     // 下一页 当前页结束 后翻一页
     if (offset > 0) {
-      this.begin = this.end
-      this.end = nextPage(this.begin!)
+      begin = nextPage(index)
+      end = nextPage(begin)
+      // 已达尾页
+      if (begin === contentLength && end === contentLength) {
+        // 从尾开始读一页
+        begin = nextPage(contentLength, { offset: -1 })
+      }
     }
     // 上一页 当前页起始 前翻一页
     else if (offset < 0) {
-      this.end = this.begin
-      this.begin = nextPage(this.begin!)
-    }
-    const string = this.content!.substring(this.begin!, this.end)
-    log.debug(`Reader ==> ${this.begin}..${this.end} = ${string}`)
-    this.conf.set('index', this.begin)
-
-    if (this.begin === this.end) {
-      if (offset >= 0 && this.begin === contentLength) {
-        return '已经是最后一页'
-      } else if (offset < 0 && this.end === 0) {
-        return '已经是第一页'
+      begin = nextPage(index)
+      end = index
+      // 已达首页
+      if (begin === 0 && end === 0) {
+        // 从头开始读一页
+        end = nextPage(0, { offset: 1 })
       }
     }
+    // offset = 0
+    else {
+      begin = index
+      end = nextPage(index)
+    }
+    const string = this.content!.substring(begin, end)
+    log.debug(`Reader ==> ${begin}..${end} = ${string}`)
+    this.conf.set('index', begin)
+
     return string
   }
 
@@ -209,8 +215,6 @@ export class Reader {
       return
     }
 
-    this.begin = undefined
-    this.end = undefined
     this.conf.set('index', index)
 
     this.mainWindow.webContents.send('refresh-content')
