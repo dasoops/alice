@@ -7,7 +7,7 @@ interface Api {
   toggleDisplay: () => void
   reader: {
     read: (offset: number) => Promise<string>
-  },
+  }
   conf: Conf<Config>
 }
 
