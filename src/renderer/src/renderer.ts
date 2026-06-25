@@ -46,10 +46,12 @@ async function init0(): Promise<void> {
 
 async function changePage(offset: number): Promise<void> {
   const contentDiv = document.getElementById('content')
-  let content = await api.reader.read(offset)
-  content = content.replace(/\n/g, br) || 'No content'
-  if (content.startsWith(br)) content = content.substring(br.length)
+  const content = await api.reader.read(offset)
   contentDiv!.innerHTML = content
+    .split('\n')
+    .map((it) => it.trim())
+    .filter((it) => it.length > 0)
+    .join(br)
 }
 
 init()
