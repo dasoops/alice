@@ -24,6 +24,9 @@ jobs:
 
       - name: Install Dependencies
         run: npm install
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
 
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
