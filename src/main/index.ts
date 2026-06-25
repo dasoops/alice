@@ -66,6 +66,10 @@ function createWindow({ conf, store }: { conf: Conf<WindowConfig>; store: Store 
     }
   })
 
+  // ctrl + w 不关闭窗口
+  // @see: https://stackoverflow.com/questions/60350520/electron-browser-window-prevent-controlw-closing-window
+  mainWindow.setMenu(null)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
