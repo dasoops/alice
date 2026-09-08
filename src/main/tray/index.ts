@@ -86,6 +86,12 @@ export class TrayManager {
           enabled: chapterItems.length > 0,
           submenu: chapterItems.length > 0 ? chapterItems : undefined
         },
+        {
+          label: '跳转章节号',
+          enabled: chapterItems.length > 0,
+          click: () => this.showJumpChapterDialog()
+        },
+        { type: 'separator' },
         { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
         { label: '打开阅读文件', click: () => this.openReadFile() },
         { label: '打开阅读文件缓存', click: () => this.openReadFileCache() },
@@ -176,6 +182,46 @@ export class TrayManager {
       return
     }
     await this.reader.jumpPage(pageNumber)
+  }
+
+  async showJumpChapterDialog(): Promise<void> {
+    await this.initlization
+
+    const chapters = await this.reader.chapters()
+    if (chapters.length === 0) {
+      error('未识别到章节')
+      return
+    }
+
+    const currentChapterIndex = await this.reader.currentChapterIndex()
+    // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
+    const current = Math.max(currentChapterIndex, 0)
+    const maxChapterInedx = chapters.length - 1
+    const chapterInput = await prompt(
+      {
+        icon: icon,
+        title: `选择章节`,
+        label: `请输入章节序号 (0 - ${maxChapterInedx})`,
+        value: current.toString(),
+        inputAttrs: {
+          type: 'number',
+          min: '0',
+          max: maxChapterInedx.toString()
+        },
+        type: 'input',
+        width: 440,
+        height: 200
+      },
+      this.mainWindow
+    )
+
+    if (!chapterInput) return
+    const chapterIndex = parseInt(chapterInput)
+    if (isNaN(chapterIndex) || chapterIndex < 0 || chapterIndex >= chapters.length) {
+      error('章节序号无效')
+      return
+    }
+    await this.reader.jumpChapter(chapterIndex)
   }
 
   async showSelectFileDialog(): Promise<void> {
