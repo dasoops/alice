@@ -44,7 +44,7 @@ export class TrayManager {
 
   private async init(): Promise<void> {
     log.info(`TrayManager ==> init`)
-    this.create0()
+    await this.create0()
 
     this.mainWindow.on('show', () => this.create())
     this.mainWindow.on('hide', () => this.destroy())
@@ -53,19 +53,39 @@ export class TrayManager {
 
   async create(): Promise<void> {
     await this.initlization
-    this.create0()
+    await this.create0()
   }
 
-  private create0(): void {
+  private async create0(): Promise<void> {
     log.info(`TrayManager ==> create`)
     if (this.tray) return
     this.tray = new Tray(icon)
     this.tray.setToolTip('Alice')
     this.tray.on('click', this.handler.toggleDisplay)
 
+    const chapters = await this.reader.chapters()
+    const currentChapterIndex = await this.reader.currentChapterIndex()
+    const chapterItems = chapters.map((it) => {
+      // 章节标题超 40 字符截断
+      const label = it.title.length > 40 ? `${it.title.substring(0, 40)}…` : it.title
+      return {
+        label: label,
+        type: 'checkbox' as const,
+        checked: it.index === currentChapterIndex,
+        click: (): void => {
+          this.jumpChapter(it.index).then(null)
+        }
+      }
+    })
+
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: '跳转行数', click: () => this.showJumpDialog() },
+        {
+          label: '跳转章节',
+          enabled: chapterItems.length > 0,
+          submenu: chapterItems.length > 0 ? chapterItems : undefined
+        },
         { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
         { label: '打开阅读文件', click: () => this.openReadFile() },
         { label: '打开阅读文件缓存', click: () => this.openReadFileCache() },
@@ -119,6 +139,11 @@ export class TrayManager {
   async openConfigDir(): Promise<void> {
     await this.initlization
     await shell.openPath(configDir)
+  }
+
+  async jumpChapter(index: number): Promise<void> {
+    await this.initlization
+    await this.reader.jumpChapter(index)
   }
 
   async showJumpDialog(): Promise<void> {
