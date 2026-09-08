@@ -1,17 +1,14 @@
 import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
-import { dataDir, error, lineSeparator, md5 } from '../util'
+import { dataDir, error, md5 } from '../util'
+import { lineSeparator } from '../constants'
 import path from 'path'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
+import { buildToc, Chapter, compileChapterRegexes } from './toc'
 
-export type Chapter = {
-  index: number
-  title: string
-  beginChar: number
-  endChar: number
-}
+export type { Chapter } from './toc'
 
 export type Config = {
   file: string
@@ -163,47 +160,13 @@ export class Reader {
   }
 
   private chapterRegexes(): RegExp[] {
-    const patterns = this.conf.get('txtChapterRegex')
-    const regexes: RegExp[] = []
-    for (const pattern of patterns) {
-      try {
-        regexes.push(new RegExp(pattern))
-      } catch {
-        error(`无效的章节正则: ${pattern}`)
-      }
-    }
-    return regexes
+    return compileChapterRegexes(this.conf.get('txtChapterRegex'), (pattern) =>
+      error(`无效的章节正则: ${pattern}`)
+    )
   }
 
   private buildToc(content: string): Chapter[] {
-    const regexes = this.chapterRegexes()
-    if (regexes.length === 0) return []
-
-    // 缓存内容行以 lineSeparator 连接, 逐行累计字符偏移
-    const entries: { title: string; beginChar: number }[] = []
-    let offset = 0
-    for (const line of content.split(lineSeparator)) {
-      if (line.length > 0 && regexes.some((regex) => regex.test(line))) {
-        entries.push({ title: line, beginChar: offset })
-      }
-      offset += line.length + 1
-    }
-    if (entries.length === 0) return []
-
-    const chapters: Chapter[] = []
-    // 首个标题行之前的非空内容作为第 0 章
-    if (content.substring(0, entries[0].beginChar).trim().length > 0) {
-      chapters.push({ index: 0, title: '前言', beginChar: 0, endChar: entries[0].beginChar })
-    }
-    for (let i = 0; i < entries.length; i++) {
-      chapters.push({
-        index: chapters.length,
-        title: entries[i].title,
-        beginChar: entries[i].beginChar,
-        endChar: i + 1 < entries.length ? entries[i + 1].beginChar : content.length
-      })
-    }
-    return chapters
+    return buildToc(this.chapterRegexes(), content)
   }
 
   async read(offset: number): Promise<string> {

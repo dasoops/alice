@@ -5,7 +5,6 @@ import crypto from 'crypto'
 import fs from 'fs'
 
 // export const icon = icon
-export const lineSeparator = '\n'
 export const dataDir = path.resolve(app.getPath('userData'), '.alice')
 export const configDir = path.join(dataDir, 'electron-conf')
 
