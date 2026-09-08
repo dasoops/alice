@@ -66,8 +66,8 @@ export class TrayManager {
     const chapters = await this.reader.chapters()
     const currentChapterIndex = await this.reader.currentChapterIndex()
     const chapterItems = chapters.map((it) => {
-      // 章节标题超 40 字符截断
-      const label = it.title.length > 40 ? `${it.title.substring(0, 40)}…` : it.title
+      // 章节标题超 20 字符截断
+      const label = it.title.length > 20 ? `${it.title.substring(0, 20)}…` : it.title
       return {
         label: label,
         type: 'checkbox' as const,
