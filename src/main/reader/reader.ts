@@ -7,45 +7,25 @@ import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
 import { Chapter, findChapterAt } from './chapter'
 import { compileChapterRegexes } from './txt/toc'
-import type { BookType } from './parser'
+import type { Book } from './parser'
 import { createParser } from './parser'
-import type { BookMeta } from './progress'
 import { WebDavClient } from '../webdav'
 import { ProgressSync } from './sync'
 import EventEmitter from 'node:events'
 import type { Config } from './config'
-
-function findNthIndex(str: string, char: string, skip: number): number {
-  let count = 0
-  for (let i = 0; i < str.length; i++) {
-    if (str[i] === char) {
-      if (count === skip) return i
-      count++
-    }
-  }
-  return -1
-}
 
 export class Reader extends EventEmitter {
   private readonly conf: Conf<Config>
   private readonly mainWindow: BrowserWindow
   private readonly webdav: WebDavClient
   public readonly progressSync: ProgressSync
-
-  public filePath?: PathLike
-  public bookType: BookType = 'txt'
   public initlization: Promise<void>
-
-  private content?: string
-  private bookName = ''
-  private bookAuthor = ''
-  public chapters: Chapter[] = []
+  // load 完成前为空壳, 外部访问须先 await initlization
+  public book: Book = { type: 'txt', path: '', name: '', author: '', content: '', chapters: [] }
   // 最近包含当前 index 的章节; index 在首章前或 toc 为空时为 undefined
   public chapter?: Chapter
-
-  // 元数据来自解析结果: epub 取自 OPF 元数据, txt 取自文件名
-  public get metadata(): BookMeta {
-    return { name: this.bookName, author: this.bookAuthor }
+  public get index(): number {
+    return this.conf.get('index')
   }
 
   constructor({
@@ -74,8 +54,8 @@ export class Reader extends EventEmitter {
   private async init(): Promise<void> {
     log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
-    this.content = await this.load(this.conf.get('file'))
-    this.refreshChapter(this.conf.get('index'))
+    await this.load(this.conf.get('file'))
+    this.refreshChapter(this.index)
     this.conf.onDidChange('index', (newValue) => {
       if (typeof newValue !== 'number') throw Error('unexpected')
       this.refreshChapter(newValue)
@@ -84,9 +64,9 @@ export class Reader extends EventEmitter {
       if (!newValue) throw Error('unexpected')
       // clear
       this.conf.reset('index')
-      this.content = await this.load(newValue as string)
+      await this.load(newValue as string)
       // load 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
-      this.refreshChapter(this.conf.get('index'))
+      this.refreshChapter(this.index)
       this.mainWindow.webContents.send('refresh-content')
     })
     ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
@@ -99,24 +79,18 @@ export class Reader extends EventEmitter {
   // 重算当前章节, 跨章时 emit 'chapter'; index 在首章前或 toc 为空时 chapter 为 undefined
   private refreshChapter(index: number): void {
     const previous = this.chapter
-    const current = findChapterAt(this.chapters, index)
+    const current = findChapterAt(this.book.chapters, index, this.chapter)
     if (current === previous) return
     this.chapter = current
     this.emit('chapter', current, previous)
   }
 
-  private async load(filePath: PathLike): Promise<string> {
-    this.filePath = filePath
+  private async load(filePath: PathLike): Promise<void> {
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
 
-    const parsed = await createParser(String(filePath), {
+    this.book = await createParser(String(filePath), {
       txtChapterRegexes: this.chapterRegexes()
     }).parse()
-    this.bookType = parsed.type
-    this.bookName = parsed.name
-    this.bookAuthor = parsed.author
-    this.chapters = parsed.chapters
-    return parsed.content
   }
 
   private chapterRegexes(): RegExp[] {
@@ -129,7 +103,8 @@ export class Reader extends EventEmitter {
   async read(offset: number): Promise<string> {
     await this.initlization
     const { chunkSize, index, maxLine } = this.conf.store
-    const contentLength = this.content!.length
+    const content = this.book.content
+    const contentLength = content.length
     log.debug(`Reader ==> index: ${index}`)
 
     const nextPage = (
@@ -150,7 +125,7 @@ export class Reader extends EventEmitter {
         if (target < 0 || target > contentLength) break
         pageIndex = target
 
-        const char = this.content![pageIndex]
+        const char = content[pageIndex]
         if (char === lineSeparator) line++
       }
       return pageIndex
@@ -183,7 +158,7 @@ export class Reader extends EventEmitter {
       begin = index
       end = nextPage(index)
     }
-    const string = this.content!.substring(begin, end)
+    const string = content.substring(begin, end)
     log.debug(`Reader ==> ${begin}..${end} = ${string}`)
     this.conf.set('index', begin)
 
@@ -192,27 +167,29 @@ export class Reader extends EventEmitter {
 
   async currentLine(): Promise<number> {
     await this.initlization
-    const index = this.conf.get('index')
-    return this.content!.substring(0, index + 1).split(lineSeparator).length
+    return this.book.content.substring(0, this.index + 1).split(lineSeparator).length
   }
 
   async totalLine(): Promise<number> {
     await this.initlization
-    return this.content!.split(lineSeparator).length
+    return this.book.content.split(lineSeparator).length
   }
 
   async jumpLine(value: number): Promise<void> {
     await this.initlization
-    let index: number
-    if (value === 1) {
-      index = 0
-    } else {
+    let index = 0
+    if (value > 1) {
       // 第4行: 跳过前2个分隔符, 找到第3行末尾分隔符, +1即为第4行起始点
-      index = findNthIndex(this.content!, lineSeparator, value - 2) + 1
-    }
-    if (index === -1) {
-      error('指定行数不存在')
-      return
+      index = -1
+      for (let n = 0; n < value - 1; n++) {
+        index = this.book.content.indexOf(lineSeparator, index + 1)
+        if (index === -1) break
+      }
+      if (index === -1) {
+        error('指定行数不存在')
+        return
+      }
+      index++
     }
 
     this.conf.set('index', index)
@@ -222,40 +199,26 @@ export class Reader extends EventEmitter {
 
   async jumpChapter(index: number, position: number = 0): Promise<void> {
     await this.initlization
-    if (this.chapters.length === 0) {
+    if (this.book.chapters.length === 0) {
       error('未识别到章节')
       return
     }
     let chapter: Chapter
     if (index < 0) {
-      chapter = this.chapters[0]
-    } else if (index > this.chapters.length - 1) {
+      chapter = this.book.chapters[0]
+    } else if (index > this.book.chapters.length - 1) {
       // 越界时跳转到最后一章
-      chapter = this.chapters.at(-1)!
+      chapter = this.book.chapters.at(-1)!
     } else {
-      chapter = this.chapters.find((it) => it.index === index) ?? this.chapters[0]
+      chapter = this.book.chapters.find((it) => it.index === index) ?? this.book.chapters[0]
     }
 
     // 超过本章, 跳转到下章开头; 无下章(末章)时跳到章节末尾
     if (chapter.beginChar + position > chapter.endChar) {
-      chapter = this.chapters.find((it) => it.index === chapter.index + 1) ?? chapter
+      chapter = this.book.chapters.find((it) => it.index === chapter.index + 1) ?? chapter
     }
     const target = Math.min(chapter.beginChar + position, chapter.endChar)
     this.conf.set('index', Math.max(target, chapter.beginChar))
     this.mainWindow.webContents.send('refresh-content')
-  }
-
-  // 全文字符偏移 → 章内进度, durChapterPos = index - beginChar
-  async indexToChapter(
-    index: number
-  ): Promise<{ chapterIndex: number; position: number; title: string }> {
-    await this.initlization
-    const chapter = findChapterAt(this.chapters, index)
-    if (!chapter) return { chapterIndex: 0, position: 0, title: '' }
-    return {
-      chapterIndex: chapter.index,
-      position: index - chapter.beginChar,
-      title: chapter.title
-    }
   }
 }

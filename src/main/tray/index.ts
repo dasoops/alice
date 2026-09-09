@@ -85,7 +85,7 @@ export class TrayManager {
 
   private buildMenu(): Menu {
     const chapter = this.reader.chapter
-    const chapters = this.reader.chapters
+    const chapters = this.reader.book.chapters
     const chapterItems = chapters.map((it) => {
       // 章节标题超 20 字符截断
       const label = it.title.length > 20 ? `${it.title.substring(0, 20)}…` : it.title
@@ -207,7 +207,7 @@ export class TrayManager {
     await this.initlization
     await this.reader.initlization
 
-    const chapters = this.reader.chapters
+    const chapters = this.reader.book.chapters
     if (chapters.length === 0) {
       error('未识别到章节')
       return

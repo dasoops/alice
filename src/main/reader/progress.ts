@@ -1,7 +1,7 @@
 // https://github.com/HapeLee/legado-with-MD3/blob/1d69ec70d246b93867cba32db93ec5110511612e/app/src/main/java/io/legado/app/help/AppWebDav.kt
 // 根据 legado-with-MD3 AppWebDav 实现复刻, 保证 算法 / 结构 与其相同
 
-// 书名/作者共同决定远端进度文件名 (name_author.json)
+// 同步所需的最小书目信息
 export type BookMeta = {
   name: string
   author: string

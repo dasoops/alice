@@ -112,7 +112,7 @@ export class ProgressSync {
 
     // 前置约束: legado 未配置规则会自动选规则/拆分超长章节, 导致序号错位
     await this.reader.initlization
-    const chapters = this.reader.chapters
+    const chapters = this.reader.book.chapters
     if (this.conf.get('txt')?.chapterRegex.length === 0 || chapters.length === 0) {
       if (!this.warnedNoChapter) {
         this.warnedNoChapter = true
@@ -122,7 +122,7 @@ export class ProgressSync {
     }
 
     // name 决定远端文件名, 为空会生成 "_.json" 污染远端目录
-    const book = this.reader.metadata
+    const book = this.reader.book
     if (!book.name) {
       // name 决定远端文件名, 为空会生成 "_.json" 污染远端目录
       log.warn('WebDavSync ==> book name empty, sync skipped')
@@ -153,7 +153,7 @@ export class ProgressSync {
   private async localProgress(book: BookMeta): Promise<BookProgress> {
     await this.reader.initlization
     const { chapterIndex, position, title } = await this.reader.indexToChapter(
-      this.conf.get('index')
+      this.reader.index
     )
     return {
       name: book.name,
