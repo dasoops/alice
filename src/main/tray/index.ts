@@ -277,9 +277,13 @@ export class TrayManager {
 
   async toggleSync(value: boolean): Promise<void> {
     await this.initlization
-    this.conf.webdav.set('enabled', value)
-    if (value && !this.conf.webdav.get('url')) {
+    const { url, username, password } = this.conf.webdav.store
+    if (value && (!url || !username || !password)) {
+      // 不写入 enabled, 重建菜单复位勾选显示
+      this.refreshContextMenu()
       error('请先在 webdav.json 配置 url/username/password')
+      return
     }
+    this.conf.webdav.set('enabled', value)
   }
 }
