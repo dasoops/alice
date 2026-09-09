@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { Conf } from 'electron-conf'
 import { Config as ReaderConfig, Reader } from './reader'
+import { Config as WebDavConfig, WebDavClient } from './webdav'
 import { Config as ShortcutConfig, ShortcutManager } from './shortcut'
 import log from 'electron-log/main'
 import { configDir } from './util'
@@ -25,6 +26,7 @@ function registerConfig(): {
   window: Conf<WindowConfig>
   reader: Conf<ReaderConfig>
   shortcut: Conf<ShortcutConfig>
+  webdav: Conf<WebDavConfig>
 } {
   const extra = { dir: configDir }
   return {
@@ -41,6 +43,11 @@ function registerConfig(): {
     shortcut: new Conf<ShortcutConfig>({
       name: 'shortcut',
       defaults: ShortcutConfig.Default,
+      ...extra
+    }),
+    webdav: new Conf<WebDavConfig>({
+      name: 'webdav',
+      defaults: WebDavConfig.Default,
       ...extra
     })
   }
@@ -143,17 +150,17 @@ app.whenReady().then(async () => {
   })
 
   const conf = registerConfig()
-  app.on('before-quit', () => {
-    conf.window.set(mainWindow.getBounds())
-  })
 
   const store = new Store()
 
   const mainWindow = createWindow({ conf: conf.window, store: store })
 
+  const webdav = new WebDavClient(conf.webdav)
+
   const reader = new Reader({
     conf: conf.reader,
-    mainWindow: mainWindow
+    mainWindow: mainWindow,
+    webdav: webdav
   })
 
   const ipcSend =
@@ -181,7 +188,7 @@ app.whenReady().then(async () => {
     }
   })
   const trayManager = new TrayManager({
-    conf: { reader: conf.reader, window: conf.window },
+    conf: { reader: conf.reader, window: conf.window, webdav: conf.webdav },
     reader: reader,
     mainWindow: mainWindow,
     handler: {
@@ -189,9 +196,21 @@ app.whenReady().then(async () => {
       exit: app.quit
     }
   })
-  for (const it of [reader, shortcutManager, trayManager]) {
+  for (const it of [reader, shortcutManager, trayManager, reader.progressSync]) {
     await it.initlization
   }
+
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      conf.window.set(mainWindow.getBounds())
+    }
+    if (quitting) return
+    // 阻止立即退出, 待进度同步 flush 完成后再退出
+    event.preventDefault()
+    quitting = true
+    reader.progressSync.flush().finally(() => app.quit())
+  })
 })
 
 app.on('window-all-closed', () => {

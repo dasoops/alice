@@ -1,5 +1,4 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import { ipcRenderer } from 'electron'
 import { Conf } from 'electron-conf'
 import { Config } from '../main/reader/index'
 

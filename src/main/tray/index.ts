@@ -3,6 +3,7 @@ import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
 import { configDir, error } from '../util'
 import { Config as ReaderConfig, Reader } from '../reader'
+import { Config as WebDavConfig } from '../webdav'
 import path from 'path'
 import log from 'electron-log/main'
 import prompt from 'electron-prompt'
@@ -14,7 +15,11 @@ export type Handler = {
 }
 
 export class TrayManager {
-  private readonly conf: { reader: Conf<ReaderConfig>; window: Conf<WindowConfig> }
+  private readonly conf: {
+    reader: Conf<ReaderConfig>
+    window: Conf<WindowConfig>
+    webdav: Conf<WebDavConfig>
+  }
   private readonly reader: Reader
   private readonly mainWindow: BrowserWindow
   private readonly handler: Handler
@@ -29,7 +34,11 @@ export class TrayManager {
     mainWindow,
     handler
   }: {
-    conf: { reader: Conf<ReaderConfig>; window: Conf<WindowConfig> }
+    conf: {
+      reader: Conf<ReaderConfig>
+      window: Conf<WindowConfig>
+      webdav: Conf<WebDavConfig>
+    }
     reader: Reader
     mainWindow: BrowserWindow
     handler: Handler
@@ -63,15 +72,16 @@ export class TrayManager {
     this.tray.setToolTip('Alice')
     this.tray.on('click', this.handler.toggleDisplay)
 
-    const chapters = await this.reader.chapters()
-    const currentChapterIndex = await this.reader.currentChapterIndex()
+    await this.reader.initlization
+    const chapter = this.reader.chapter
+    const chapters = this.reader.chapters
     const chapterItems = chapters.map((it) => {
       // 章节标题超 20 字符截断
       const label = it.title.length > 20 ? `${it.title.substring(0, 20)}…` : it.title
       return {
         label: label,
         type: 'checkbox' as const,
-        checked: it.index === currentChapterIndex,
+        checked: it.index === chapter?.index,
         click: (): void => {
           this.jumpChapter(it.index).then(null)
         }
@@ -105,6 +115,12 @@ export class TrayManager {
           label: '鼠标点击穿透',
           click: ({ checked }) => this.togglePenetrate(checked).then(null),
           checked: this.conf.window.get('penetrate')
+        },
+        {
+          type: 'checkbox',
+          label: 'WebDav 同步',
+          click: ({ checked }) => this.toggleSync(checked).then(null),
+          checked: this.conf.webdav.get('enabled')
         },
         { label: '退出', click: () => this.handler.exit() }
       ])
@@ -181,21 +197,21 @@ export class TrayManager {
       error('页码无效')
       return
     }
-    await this.reader.jumpPage(pageNumber)
+    await this.reader.jumpLine(pageNumber)
   }
 
   async showJumpChapterDialog(): Promise<void> {
     await this.initlization
+    await this.reader.initlization
 
-    const chapters = await this.reader.chapters()
+    const chapters = this.reader.chapters
     if (chapters.length === 0) {
       error('未识别到章节')
       return
     }
 
-    const currentChapterIndex = await this.reader.currentChapterIndex()
     // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
-    const current = Math.max(currentChapterIndex, 0)
+    const current = Math.max(this.reader.chapter?.index ?? -1, 0)
     const maxChapterInedx = chapters.length - 1
     const chapterInput = await prompt(
       {
@@ -248,5 +264,13 @@ export class TrayManager {
   async togglePenetrate(value: boolean): Promise<void> {
     await this.initlization
     this.conf.window.set('penetrate', value)
+  }
+
+  async toggleSync(value: boolean): Promise<void> {
+    await this.initlization
+    this.conf.webdav.set('enabled', value)
+    if (value && !this.conf.webdav.get('url')) {
+      error('请先在 webdav.json 配置 url/username/password')
+    }
   }
 }

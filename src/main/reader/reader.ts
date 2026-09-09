@@ -6,7 +6,11 @@ import path from 'path'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
-import { buildToc, Chapter, compileChapterRegexes } from './toc'
+import { buildToc, Chapter, compileChapterRegexes, findChapterAt } from './toc'
+import type { BookMeta } from './progress'
+import { WebDavClient } from '../webdav'
+import { ProgressSync } from './sync'
+import EventEmitter from 'node:events'
 import type { Config } from './config'
 
 function findNthIndex(str: string, char: string, skip: number): number {
@@ -20,24 +24,46 @@ function findNthIndex(str: string, char: string, skip: number): number {
   return -1
 }
 
-export class Reader {
+export class Reader extends EventEmitter {
   private readonly conf: Conf<Config>
   private readonly mainWindow: BrowserWindow
+  private readonly webdav: WebDavClient
+  public readonly progressSync: ProgressSync
+
   private readonly cacheDir = path.join(dataDir, 'cache')
-  private content?: string
-  private toc: Chapter[] = []
+  public filePath?: PathLike
   public cachePath?: string
-  public tocPath?: string
   public initlization: Promise<void>
 
-  constructor({ conf, mainWindow }: { conf: Conf<Config>; mainWindow: BrowserWindow }) {
+  private content?: string
+  public chapters: Chapter[] = []
+  // 最近包含当前 index 的章节; index 在首章前或 toc 为空时为 undefined
+  public chapter?: Chapter
+
+  public get metadata(): BookMeta {
+    const file = String(this.filePath ?? '')
+    return { name: path.basename(file, path.extname(file)), author: '' }
+  }
+
+  constructor({
+    conf,
+    mainWindow,
+    webdav
+  }: {
+    conf: Conf<Config>
+    mainWindow: BrowserWindow
+    webdav: WebDavClient
+  }) {
+    super()
     this.conf = conf
     this.mainWindow = mainWindow
-
-    // ensure dir
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true })
-    }
+    this.webdav = webdav
+    this.progressSync = new ProgressSync({
+      conf: conf,
+      reader: this,
+      webdav: this.webdav,
+      mainWindow: mainWindow
+    })
 
     this.initlization = this.init()
   }
@@ -47,14 +73,24 @@ export class Reader {
       `Reader ==> init, conf: ${JSON.stringify(this.conf.store)}, cacheDir: ${this.cacheDir}`
     )
 
-    this.content = await this.init0(this.conf.get('file'))
+    // ensure dir
+    if (!fs.existsSync(this.cacheDir)) {
+      fs.mkdirSync(this.cacheDir, { recursive: true })
+    }
 
+    this.content = await this.init0(this.conf.get('file'))
+    this.refreshChapter(this.conf.get('index'))
+    this.conf.onDidChange('index', (newValue) => {
+      if (typeof newValue !== 'number') throw Error('unexpected')
+      this.refreshChapter(newValue)
+    })
     this.conf.onDidChange('file', async (newValue) => {
       if (!newValue) throw Error('unexpected')
       // clear
-      this.cachePath = undefined
-      this.conf.set('index', 0)
+      this.conf.reset('index')
       this.content = await this.init0(newValue as string)
+      // init0 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
+      this.refreshChapter(this.conf.get('index'))
       this.mainWindow.webContents.send('refresh-content')
     })
     ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
@@ -64,7 +100,17 @@ export class Reader {
     log.info(`Reader <== init ok.`)
   }
 
+  // 重算当前章节, 跨章时 emit 'chapter'; index 在首章前或 toc 为空时 chapter 为 undefined
+  private refreshChapter(index: number): void {
+    const previous = this.chapter
+    const current = findChapterAt(this.chapters, index)
+    if (current === previous) return
+    this.chapter = current
+    this.emit('chapter', current, previous)
+  }
+
   private async init0(filePath: PathLike): Promise<string> {
+    this.filePath = filePath
     // create hash
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
     const fileMd5 = await md5(filePath)
@@ -74,7 +120,6 @@ export class Reader {
     const tocPath = path.resolve(this.cacheDir, `${fileMd5}.toc`)
 
     this.cachePath = cachePath
-    this.tocPath = tocPath
     const result = (): string => {
       log.info(`Reader ==> open ${cachePath}`)
       return fs.readFileSync(cachePath, 'utf-8')
@@ -83,12 +128,12 @@ export class Reader {
     const hashPath = path.resolve(this.cacheDir, `${fileMd5}.hash`)
     if (fs.existsSync(hashPath) && fileMd5 === fs.readFileSync(hashPath, 'utf-8')) {
       if (fs.existsSync(tocPath)) {
-        this.toc = JSON.parse(fs.readFileSync(tocPath, 'utf-8')) as Chapter[]
+        this.chapters = JSON.parse(fs.readFileSync(tocPath, 'utf-8')) as Chapter[]
         return result()
       }
       const content = result()
-      this.toc = this.buildToc(content)
-      fs.writeFileSync(tocPath, JSON.stringify(this.toc), 'utf-8')
+      this.chapters = this.buildToc(content)
+      fs.writeFileSync(tocPath, JSON.stringify(this.chapters), 'utf-8')
       return content
     }
 
@@ -133,8 +178,8 @@ export class Reader {
 
     // create toc file
     const content = result()
-    this.toc = this.buildToc(content)
-    fs.writeFileSync(tocPath, JSON.stringify(this.toc), 'utf-8')
+    this.chapters = this.buildToc(content)
+    fs.writeFileSync(tocPath, JSON.stringify(this.chapters), 'utf-8')
 
     return content
   }
@@ -224,7 +269,7 @@ export class Reader {
     return this.content!.split(lineSeparator).length
   }
 
-  async jumpPage(value: number): Promise<void> {
+  async jumpLine(value: number): Promise<void> {
     await this.initlization
     let index: number
     if (value === 1) {
@@ -243,32 +288,42 @@ export class Reader {
     this.mainWindow.webContents.send('refresh-content')
   }
 
-  async chapters(): Promise<Chapter[]> {
+  async jumpChapter(index: number, position: number = 0): Promise<void> {
     await this.initlization
-    return this.toc
-  }
-
-  async currentChapterIndex(): Promise<number> {
-    await this.initlization
-    const index = this.conf.get('index')
-    let current = -1
-    for (const it of this.toc) {
-      if (index < it.beginChar) break
-      current = it.index
-    }
-    return current
-  }
-
-  async jumpChapter(value: number): Promise<void> {
-    await this.initlization
-    const chapter = this.toc.find((it) => it.index === value)
-    if (!chapter) {
-      error('指定章节不存在')
+    if (this.chapters.length === 0) {
+      error('未识别到章节')
       return
     }
+    let chapter: Chapter
+    if (index < 0) {
+      chapter = this.chapters[0]
+    } else if (index > this.chapters.length - 1) {
+      // 越界时跳转到最后一章
+      chapter = this.chapters.at(-1)!
+    } else {
+      chapter = this.chapters.find((it) => it.index === index) ?? this.chapters[0]
+    }
 
-    this.conf.set('index', chapter.beginChar)
-
+    // 超过本章, 跳转到下章开头; 无下章(末章)时跳到章节末尾
+    if (chapter.beginChar + position > chapter.endChar) {
+      chapter = this.chapters.find((it) => it.index === chapter.index + 1) ?? chapter
+    }
+    const target = Math.min(chapter.beginChar + position, chapter.endChar)
+    this.conf.set('index', Math.max(target, chapter.beginChar))
     this.mainWindow.webContents.send('refresh-content')
+  }
+
+  // 全文字符偏移 → 章内进度, durChapterPos = index - beginChar
+  async indexToChapter(
+    index: number
+  ): Promise<{ chapterIndex: number; position: number; title: string }> {
+    await this.initlization
+    const chapter = findChapterAt(this.chapters, index)
+    if (!chapter) return { chapterIndex: 0, position: 0, title: '' }
+    return {
+      chapterIndex: chapter.index,
+      position: index - chapter.beginChar,
+      title: chapter.title
+    }
   }
 }
