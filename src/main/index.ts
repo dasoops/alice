@@ -202,6 +202,7 @@ app.whenReady().then(async () => {
 
   let quitting = false
   app.on('before-quit', (event) => {
+    log.info('App ==> before-quit')
     if (mainWindow && !mainWindow.isDestroyed()) {
       conf.window.set(mainWindow.getBounds())
     }
@@ -209,7 +210,10 @@ app.whenReady().then(async () => {
     // 阻止立即退出, 待进度同步 flush 完成后再退出
     event.preventDefault()
     quitting = true
-    reader.progressSync.flush().finally(() => app.quit())
+    reader.progressSync
+      .flush()
+      .then(() => log.info('App ==> progress flush done, quitting'))
+      .finally(() => app.quit())
   })
 })
 

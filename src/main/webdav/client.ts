@@ -1,5 +1,6 @@
 import { net } from 'electron'
 import { Conf } from 'electron-conf'
+import log from 'electron-log/main'
 
 export type Config = {
   enabled: boolean
@@ -86,12 +87,20 @@ export class WebDavClient {
     const headers: Record<string, string> = { Authorization: this.authHeader() }
     if (body !== undefined && contentType) headers['Content-Type'] = contentType
 
-    const response = await net.fetch(url.href, {
-      method: method,
-      headers: headers,
-      body: body,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT)
-    })
-    return { status: response.status, text: await response.text() }
+    log.info(`WebDav ==> ${method} ${url.href}`)
+    try {
+      const response = await net.fetch(url.href, {
+        method: method,
+        headers: headers,
+        body: body,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT)
+      })
+      const text = await response.text()
+      log.info(`WebDav ==> ${method} ${path} -> ${response.status}`)
+      return { status: response.status, text }
+    } catch (err) {
+      log.warn(`WebDav ==> ${method} ${path} failed: ${err}`)
+      throw err
+    }
   }
 }
