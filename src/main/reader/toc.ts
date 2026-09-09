@@ -7,16 +7,6 @@ export type Chapter = {
   endChar: number
 }
 
-// toc 缓存文件结构, 记录生成时的正则列表用于失效判断
-export type TocFile = {
-  patterns: string[]
-  chapters: Chapter[]
-}
-
-export function samePatterns(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((it, i) => it === b[i])
-}
-
 export function compileChapterRegexes(
   patterns: string[],
   onInvalid?: (pattern: string) => void
@@ -60,4 +50,14 @@ export function buildToc(regexes: RegExp[], content: string): Chapter[] {
     })
   }
   return chapters
+}
+
+// 最近包含 index 的章节; 区间为 [beginChar, endChar), index 在首章前或 toc 为空时为 undefined
+export function findChapterAt(chapters: Chapter[], index: number): Chapter | undefined {
+  let chapter: Chapter | undefined
+  for (const it of chapters) {
+    if (index < it.beginChar) break
+    chapter = it
+  }
+  return chapter
 }
