@@ -152,16 +152,17 @@ export class ProgressSync {
 
   private async localProgress(book: BookMeta): Promise<BookProgress> {
     await this.reader.initlization
-    const { chapterIndex, position, title } = await this.reader.indexToChapter(
-      this.reader.index
-    )
+    // reader.chapter 随 conf index 变化同步维护, 即当前 index 所在章节;
+    // index 在首章前或 toc 为空时回退 0 值进度
+    const chapter = this.reader.chapter
     return {
       name: book.name,
       author: book.author,
-      durChapterIndex: chapterIndex,
-      durChapterPos: this.syncMode() === 'chapter' ? 0 : position,
+      durChapterIndex: chapter?.index ?? 0,
+      durChapterPos:
+        this.syncMode() === 'chapter' || !chapter ? 0 : this.reader.index - chapter.beginChar,
       durChapterTime: Date.now(),
-      durChapterTitle: title
+      durChapterTitle: chapter?.title ?? ''
     }
   }
 
