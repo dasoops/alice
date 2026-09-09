@@ -111,7 +111,8 @@ export class Reader extends EventEmitter {
   }
 
   private chapterRegexes(): RegExp[] {
-    return compileChapterRegexes(this.conf.get('txtChapterRegex'), (pattern) =>
+    // 旧配置文件残留的顶层 txtChapterRegex 已废弃, 缺失时回退默认值
+    return compileChapterRegexes(this.conf.get('txt')?.chapterRegex ?? [], (pattern) =>
       error(`无效的章节正则: ${pattern}`)
     )
   }

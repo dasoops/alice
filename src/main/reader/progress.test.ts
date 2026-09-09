@@ -3,7 +3,8 @@ import {
   bookProgressFileName,
   compareProgress,
   replaceReservedChar,
-  type BookProgress
+  type BookProgress,
+  type SyncMode
 } from './progress'
 
 const progress = (chapterIndex: number, pos: number): BookProgress => ({
@@ -16,20 +17,29 @@ const progress = (chapterIndex: number, pos: number): BookProgress => ({
 })
 
 describe('compareProgress', () => {
+  const compare = (mode: SyncMode, a: BookProgress, b: BookProgress): number =>
+    compareProgress(mode, a, b)
+
   it('章节号优先于章内位置', () => {
-    expect(compareProgress(progress(2, 0), progress(1, 999))).toBeGreaterThan(0)
-    expect(compareProgress(progress(1, 999), progress(2, 0))).toBeLessThan(0)
+    expect(compare('approximate', progress(2, 0), progress(1, 999))).toBeGreaterThan(0)
+    expect(compare('approximate', progress(1, 999), progress(2, 0))).toBeLessThan(0)
   })
 
   it('同章比较章内位置', () => {
-    expect(compareProgress(progress(3, 100), progress(3, 50))).toBeGreaterThan(0)
-    expect(compareProgress(progress(3, 50), progress(3, 100))).toBeLessThan(0)
+    expect(compare('approximate', progress(3, 100), progress(3, 50))).toBeGreaterThan(0)
+    expect(compare('approximate', progress(3, 50), progress(3, 100))).toBeLessThan(0)
   })
 
   it('相等时为 0, 与时间戳无关', () => {
     const a = progress(3, 50)
     const b = { ...progress(3, 50), durChapterTime: 12345 }
-    expect(compareProgress(a, b)).toBe(0)
+    expect(compare('approximate', a, b)).toBe(0)
+  })
+
+  it('chapter 模式忽略章内位置, 仅按章节号比较', () => {
+    expect(compare('chapter', progress(3, 0), progress(3, 999))).toBe(0)
+    expect(compare('chapter', progress(4, 0), progress(3, 999))).toBeGreaterThan(0)
+    expect(compare('chapter', progress(3, 999), progress(4, 0))).toBeLessThan(0)
   })
 })
 

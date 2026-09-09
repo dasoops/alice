@@ -15,9 +15,15 @@ export type BookProgress = BookMeta & {
   durChapterTitle: string
 }
 
-// 合并规则: 按 (durChapterIndex, durChapterPos) 字典序比较, 与时间戳无关
-export function compareProgress(a: BookProgress, b: BookProgress): number {
-  if (a.durChapterIndex !== b.durChapterIndex) return a.durChapterIndex - b.durChapterIndex
+// approximate: 同步章内近似位置; chapter: 只同步章节信息(仅章节号, 章内位置恒为 0)
+export type SyncMode = 'approximate' | 'chapter'
+
+// 合并规则: approximate 按 (durChapterIndex, durChapterPos) 字典序比较, 与时间戳无关;
+// chapter 忽略 durChapterPos, 仅按章节号比较
+export function compareProgress(mode: SyncMode, a: BookProgress, b: BookProgress): number {
+  if (mode === 'chapter' || a.durChapterIndex !== b.durChapterIndex) {
+    return a.durChapterIndex - b.durChapterIndex
+  }
   return a.durChapterPos - b.durChapterPos
 }
 

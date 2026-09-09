@@ -4,11 +4,17 @@ import log from 'electron-log/main'
 import type { Config as ReaderConfig } from './config'
 import type { Reader } from './reader'
 import { WebDavClient } from '../webdav'
-import { bookProgressFileName, compareProgress, type BookMeta, type BookProgress } from './progress'
+import {
+  bookProgressFileName,
+  compareProgress,
+  type BookMeta,
+  type BookProgress,
+  type SyncMode
+} from './progress'
 import { error } from '../util'
 
 // interactive: 允许与用户交互(弹窗确认恢复远端进度); silent: 静默, 远端领先时直接跳过
-type SyncMode = 'interactive' | 'silent'
+type SyncTrigger = 'interactive' | 'silent'
 
 export class ProgressSync {
   private readonly conf: Conf<ReaderConfig>
@@ -22,7 +28,7 @@ export class ProgressSync {
   private currentRun?: Promise<void>
   private warnedNoChapter = false
   // 合并期间的触发以此模式参与下一轮, 后触发覆盖先触发
-  private pendingMode?: SyncMode
+  private pendingMode?: SyncTrigger
 
   constructor({
     conf,
@@ -58,7 +64,7 @@ export class ProgressSync {
   }
 
   // 同步进行中忽略新触发, 只置脏标记, 空闲后补一次
-  private readonly schedule = (mode: SyncMode = 'silent'): void => {
+  private readonly schedule = (mode: SyncTrigger = 'silent'): void => {
     this.pendingMode = mode
     if (this.currentRun) {
       this.dirty = true
@@ -97,17 +103,17 @@ export class ProgressSync {
   }
 
   // 弹窗交互的前提: 触发方声明 interactive 且此刻窗口可见(窗口隐藏时模态框不可见)
-  private canPrompt(mode: SyncMode): boolean {
+  private canPrompt(mode: SyncTrigger): boolean {
     return mode === 'interactive' && this.mainWindow.isVisible()
   }
 
-  private async syncOnce(mode: SyncMode = 'silent'): Promise<void> {
+  private async syncOnce(mode: SyncTrigger = 'silent'): Promise<void> {
     if (!this.webdav.enabled()) return
 
     // 前置约束: legado 未配置规则会自动选规则/拆分超长章节, 导致序号错位
     await this.reader.initlization
     const chapters = this.reader.chapters
-    if (this.conf.get('txtChapterRegex').length === 0 || chapters.length === 0) {
+    if (this.conf.get('txt')?.chapterRegex.length === 0 || chapters.length === 0) {
       if (!this.warnedNoChapter) {
         this.warnedNoChapter = true
         error('未配置章节规则或章节表为空, WebDav 同步已禁用')
@@ -128,15 +134,20 @@ export class ProgressSync {
     const local = await this.localProgress(book)
     const remote = await this.fetchRemote(book)
 
-    if (remote && compareProgress(remote, local) > 0) {
+    if (remote && compareProgress(this.syncMode(), remote, local) > 0) {
       if (!this.canPrompt(mode)) return
       await this.restoreRemote(remote)
       return
     }
     // 远端无进度或本地领先 → 上传; 相等 → 不动
-    if (!remote || compareProgress(local, remote) > 0) {
+    if (!remote || compareProgress(this.syncMode(), local, remote) > 0) {
       await this.webdav.put(this.progressPath(book), JSON.stringify(local))
     }
+  }
+
+  // 同步粒度: chapter 模式只同步章节信息, 上传位置恒为 0 且比较忽略章内位置
+  private syncMode(): SyncMode {
+    return this.conf.get('sync')?.mode ?? 'approximate'
   }
 
   private async localProgress(book: BookMeta): Promise<BookProgress> {
@@ -148,7 +159,7 @@ export class ProgressSync {
       name: book.name,
       author: book.author,
       durChapterIndex: chapterIndex,
-      durChapterPos: position,
+      durChapterPos: this.syncMode() === 'chapter' ? 0 : position,
       durChapterTime: Date.now(),
       durChapterTitle: title
     }
@@ -172,6 +183,8 @@ export class ProgressSync {
     })
     if (response !== 0) return
 
-    await this.reader.jumpChapter(remote.durChapterIndex, remote.durChapterPos)
+    // chapter 模式仅恢复章节信息, 跳转到章节头
+    const position = this.syncMode() === 'chapter' ? 0 : remote.durChapterPos
+    await this.reader.jumpChapter(remote.durChapterIndex, position)
   }
 }
