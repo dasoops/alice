@@ -2,12 +2,12 @@ import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
 import { error } from '../util'
 import { lineSeparator } from '../constants'
-import path from 'path'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
-import { buildToc, Chapter, compileChapterRegexes, findChapterAt } from './toc'
-import { normalizeText } from './text'
+import { Chapter, compileChapterRegexes, findChapterAt } from './toc'
+import type { BookType } from './parser'
+import { createParser } from './parser'
 import type { BookMeta } from './progress'
 import { WebDavClient } from '../webdav'
 import { ProgressSync } from './sync'
@@ -32,16 +32,19 @@ export class Reader extends EventEmitter {
   public readonly progressSync: ProgressSync
 
   public filePath?: PathLike
+  public bookType: BookType = 'txt'
   public initlization: Promise<void>
 
   private content?: string
+  private bookName = ''
+  private bookAuthor = ''
   public chapters: Chapter[] = []
   // 最近包含当前 index 的章节; index 在首章前或 toc 为空时为 undefined
   public chapter?: Chapter
 
+  // 元数据来自解析结果: epub 取自 OPF 元数据, txt 取自文件名
   public get metadata(): BookMeta {
-    const file = String(this.filePath ?? '')
-    return { name: path.basename(file, path.extname(file)), author: '' }
+    return { name: this.bookName, author: this.bookAuthor }
   }
 
   constructor({
@@ -81,7 +84,7 @@ export class Reader extends EventEmitter {
       // clear
       this.conf.reset('index')
       this.content = await this.load(newValue as string)
-      // init0 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
+      // load 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
       this.refreshChapter(this.conf.get('index'))
       this.mainWindow.webContents.send('refresh-content')
     })
@@ -105,9 +108,14 @@ export class Reader extends EventEmitter {
     this.filePath = filePath
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
 
-    const content = normalizeText(await fs.promises.readFile(filePath, 'utf-8'))
-    this.chapters = this.buildToc(content)
-    return content
+    const parsed = await createParser(String(filePath), {
+      txtChapterRegexes: this.chapterRegexes()
+    }).parse()
+    this.bookType = parsed.type
+    this.bookName = parsed.name
+    this.bookAuthor = parsed.author
+    this.chapters = parsed.chapters
+    return parsed.content
   }
 
   private chapterRegexes(): RegExp[] {
@@ -115,10 +123,6 @@ export class Reader extends EventEmitter {
     return compileChapterRegexes(this.conf.get('txt')?.chapterRegex ?? [], (pattern) =>
       error(`无效的章节正则: ${pattern}`)
     )
-  }
-
-  private buildToc(content: string): Chapter[] {
-    return buildToc(this.chapterRegexes(), content)
   }
 
   async read(offset: number): Promise<string> {
