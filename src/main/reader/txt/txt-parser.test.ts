@@ -3,8 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { compileChapterRegexes } from './toc'
-import { lineSeparator } from '../constants'
-import { createParser } from './parser'
+import { lineSeparator } from '../../constants'
+import { createParser } from '../parser'
 import { TxtParser } from './txt-parser'
 
 describe('TxtParser', () => {

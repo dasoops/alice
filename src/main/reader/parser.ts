@@ -1,5 +1,5 @@
-import type { Chapter } from './toc'
-import { TxtParser } from './txt-parser'
+import type { Chapter } from './chapter'
+import { TxtParser } from './txt/txt-parser'
 
 export type BookType = 'txt' | 'epub'
 

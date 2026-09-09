@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import path from 'path'
-import type { BookParser, ParsedBook } from './parser'
+import type { BookParser, ParsedBook } from '../parser'
 import { buildToc } from './toc'
 import { normalizeText } from './text'
 
