@@ -114,7 +114,6 @@ export class TrayManager {
       { type: 'separator' },
       { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
       { label: '打开阅读文件', click: () => this.openReadFile() },
-      { label: '打开阅读文件缓存', click: () => this.openReadFileCache() },
       { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
       { type: 'separator' },
       { label: '打开快捷键配置文件', click: () => this.openShortcutConfigFile() },
@@ -150,11 +149,6 @@ export class TrayManager {
   async openReadFile(): Promise<void> {
     await this.initlization
     await shell.openPath(this.conf.reader.get('file'))
-  }
-
-  async openReadFileCache(): Promise<void> {
-    await this.initlization
-    await shell.openPath(this.reader.cachePath!)
   }
 
   async openReadFileDir(): Promise<void> {
@@ -259,10 +253,6 @@ export class TrayManager {
         {
           name: '文本文档',
           extensions: ['txt']
-        },
-        {
-          name: 'Alice 缓存文件',
-          extensions: ['cache']
         }
       ]
     })

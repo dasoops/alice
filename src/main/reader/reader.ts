@@ -1,12 +1,13 @@
 import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
-import { dataDir, error, md5 } from '../util'
+import { error } from '../util'
 import { lineSeparator } from '../constants'
 import path from 'path'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
 import { buildToc, Chapter, compileChapterRegexes, findChapterAt } from './toc'
+import { normalizeText } from './text'
 import type { BookMeta } from './progress'
 import { WebDavClient } from '../webdav'
 import { ProgressSync } from './sync'
@@ -30,9 +31,7 @@ export class Reader extends EventEmitter {
   private readonly webdav: WebDavClient
   public readonly progressSync: ProgressSync
 
-  private readonly cacheDir = path.join(dataDir, 'cache')
   public filePath?: PathLike
-  public cachePath?: string
   public initlization: Promise<void>
 
   private content?: string
@@ -69,16 +68,9 @@ export class Reader extends EventEmitter {
   }
 
   private async init(): Promise<void> {
-    log.info(
-      `Reader ==> init, conf: ${JSON.stringify(this.conf.store)}, cacheDir: ${this.cacheDir}`
-    )
+    log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
-    // ensure dir
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true })
-    }
-
-    this.content = await this.init0(this.conf.get('file'))
+    this.content = await this.load(this.conf.get('file'))
     this.refreshChapter(this.conf.get('index'))
     this.conf.onDidChange('index', (newValue) => {
       if (typeof newValue !== 'number') throw Error('unexpected')
@@ -88,7 +80,7 @@ export class Reader extends EventEmitter {
       if (!newValue) throw Error('unexpected')
       // clear
       this.conf.reset('index')
-      this.content = await this.init0(newValue as string)
+      this.content = await this.load(newValue as string)
       // init0 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
       this.refreshChapter(this.conf.get('index'))
       this.mainWindow.webContents.send('refresh-content')
@@ -109,78 +101,12 @@ export class Reader extends EventEmitter {
     this.emit('chapter', current, previous)
   }
 
-  private async init0(filePath: PathLike): Promise<string> {
+  private async load(filePath: PathLike): Promise<string> {
     this.filePath = filePath
-    // create hash
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
-    const fileMd5 = await md5(filePath)
 
-    // 快速连续切换文件时可能并发 init0, 闭包绑定本次调用的路径, 避免读到下一次调用的 cache
-    const cachePath = path.resolve(this.cacheDir, `${fileMd5}.cache`)
-    const tocPath = path.resolve(this.cacheDir, `${fileMd5}.toc`)
-
-    this.cachePath = cachePath
-    const result = (): string => {
-      log.info(`Reader ==> open ${cachePath}`)
-      return fs.readFileSync(cachePath, 'utf-8')
-    }
-
-    const hashPath = path.resolve(this.cacheDir, `${fileMd5}.hash`)
-    if (fs.existsSync(hashPath) && fileMd5 === fs.readFileSync(hashPath, 'utf-8')) {
-      if (fs.existsSync(tocPath)) {
-        this.chapters = JSON.parse(fs.readFileSync(tocPath, 'utf-8')) as Chapter[]
-        return result()
-      }
-      const content = result()
-      this.chapters = this.buildToc(content)
-      fs.writeFileSync(tocPath, JSON.stringify(this.chapters), 'utf-8')
-      return content
-    }
-
-    // create hash file
-    fs.writeFileSync(hashPath, fileMd5, { encoding: 'utf-8' })
-
-    // clear config
-    this.conf.reset('index')
-
-    // create cache file
-    const readStream = fs.createReadStream(filePath, { encoding: 'utf-8' })
-    const writeStream = fs.createWriteStream(cachePath)
-    let currentLine = ''
-    readStream.on('data', (chunk0: Buffer | string) => {
-      const chunk = typeof chunk0 === 'string' ? chunk0 : chunk0.toString('utf-8')
-      for (let i = 0; i < chunk.length; i++) {
-        const it = chunk.charAt(i)
-
-        if (it === '\r' || it === '\n') {
-          if (currentLine.length > 0) {
-            writeStream.write(currentLine + lineSeparator)
-            currentLine = ''
-            continue
-          }
-          continue
-        }
-
-        currentLine += it
-      }
-    })
-    readStream.on('end', () => {
-      if (currentLine.length !== 0) {
-        writeStream.write(currentLine)
-      }
-      writeStream.end()
-    })
-    await new Promise((resolve, reject) => {
-      writeStream.on('finish', () => resolve(undefined))
-      writeStream.on('error', reject)
-      readStream.on('error', reject)
-    })
-
-    // create toc file
-    const content = result()
+    const content = normalizeText(await fs.promises.readFile(filePath, 'utf-8'))
     this.chapters = this.buildToc(content)
-    fs.writeFileSync(tocPath, JSON.stringify(this.chapters), 'utf-8')
-
     return content
   }
 
