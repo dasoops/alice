@@ -55,6 +55,8 @@ export class TrayManager {
     log.info(`TrayManager ==> init`)
     await this.create0()
 
+    // 章节变化(菜单点击/快捷键/翻页跨章等)时重建菜单,
+    this.reader.on('chapter', () => this.refreshContextMenu())
     this.mainWindow.on('show', () => this.create())
     this.mainWindow.on('hide', () => this.destroy())
     log.info(`TrayManager ==> init ok`)
@@ -73,6 +75,15 @@ export class TrayManager {
     this.tray.on('click', this.handler.toggleDisplay)
 
     await this.reader.initlization
+    this.refreshContextMenu()
+  }
+
+  private refreshContextMenu(): void {
+    if (!this.tray) return
+    this.tray.setContextMenu(this.buildMenu())
+  }
+
+  private buildMenu(): Menu {
     const chapter = this.reader.chapter
     const chapters = this.reader.chapters
     const chapterItems = chapters.map((it) => {
@@ -88,43 +99,41 @@ export class TrayManager {
       }
     })
 
-    this.tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: '跳转行数', click: () => this.showJumpDialog() },
-        {
-          label: '跳转章节',
-          enabled: chapterItems.length > 0,
-          submenu: chapterItems.length > 0 ? chapterItems : undefined
-        },
-        {
-          label: '跳转章节号',
-          enabled: chapterItems.length > 0,
-          click: () => this.showJumpChapterDialog()
-        },
-        { type: 'separator' },
-        { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
-        { label: '打开阅读文件', click: () => this.openReadFile() },
-        { label: '打开阅读文件缓存', click: () => this.openReadFileCache() },
-        { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
-        { type: 'separator' },
-        { label: '打开快捷键配置文件', click: () => this.openShortcutConfigFile() },
-        { label: '打开配置目录', click: () => this.openConfigDir() },
-        { type: 'separator' },
-        {
-          type: 'checkbox',
-          label: '鼠标点击穿透',
-          click: ({ checked }) => this.togglePenetrate(checked).then(null),
-          checked: this.conf.window.get('penetrate')
-        },
-        {
-          type: 'checkbox',
-          label: 'WebDav 同步',
-          click: ({ checked }) => this.toggleSync(checked).then(null),
-          checked: this.conf.webdav.get('enabled')
-        },
-        { label: '退出', click: () => this.handler.exit() }
-      ])
-    )
+    return Menu.buildFromTemplate([
+      { label: '跳转行数', click: () => this.showJumpDialog() },
+      {
+        label: '跳转章节',
+        enabled: chapterItems.length > 0,
+        submenu: chapterItems.length > 0 ? chapterItems : undefined
+      },
+      {
+        label: '跳转章节号',
+        enabled: chapterItems.length > 0,
+        click: () => this.showJumpChapterDialog()
+      },
+      { type: 'separator' },
+      { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
+      { label: '打开阅读文件', click: () => this.openReadFile() },
+      { label: '打开阅读文件缓存', click: () => this.openReadFileCache() },
+      { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
+      { type: 'separator' },
+      { label: '打开快捷键配置文件', click: () => this.openShortcutConfigFile() },
+      { label: '打开配置目录', click: () => this.openConfigDir() },
+      { type: 'separator' },
+      {
+        type: 'checkbox',
+        label: '鼠标点击穿透',
+        click: ({ checked }) => this.togglePenetrate(checked).then(null),
+        checked: this.conf.window.get('penetrate')
+      },
+      {
+        type: 'checkbox',
+        label: 'WebDav 同步',
+        click: ({ checked }) => this.toggleSync(checked).then(null),
+        checked: this.conf.webdav.get('enabled')
+      },
+      { label: '退出', click: () => this.handler.exit() }
+    ])
   }
 
   async destroy(): Promise<void> {
