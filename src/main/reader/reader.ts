@@ -59,6 +59,7 @@ export class Reader extends EventEmitter<BookEvents> {
     if (!path) throw Error('无效文件路径')
     this.conf.set('file', path)
     this.conf.reset('position')
+    this.progressSync.reset()
     await this.load(path)
     this.mainWindow.webContents.send('refresh-content')
   }
@@ -161,11 +162,11 @@ export class Reader extends EventEmitter<BookEvents> {
       return
     }
 
-    const local = this.localProgress(book)
-    const remote = await this.progressSync.sync(book, local, trigger)
+    const remote = await this.progressSync.sync(book, () => this.localProgress(book), trigger)
     if (!remote) return
 
     // chapter 模式仅恢复章节信息, 跳转到章节头
+    log.info('WebDavSync ==> 同步远端进度')
     const position = this.mode === 'chapter' ? 0 : remote.durChapterPos
     await this.jumpChapter(remote.durChapterIndex, position)
   }
