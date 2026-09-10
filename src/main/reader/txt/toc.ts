@@ -1,5 +1,6 @@
 import { lineSeparator } from '../../constants'
 import type { Chapter } from '../book'
+import log from 'electron-log/main'
 
 // 含全文字符偏移的章节; extends 共享 Chapter, 运行时经 Book.chapters 对外可见
 export type TxtChapter = Chapter & {
@@ -23,8 +24,12 @@ export function compileRegexes(
 }
 
 export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
-  if (regexes.length === 0) return []
+  if (regexes.length === 0) {
+    log.warn('TxtParser ==> 章节正则列表为空, 无法解析章节')
+    return []
+  }
 
+  log.debug('TxtParser ==> 章节正则列表: %s, 开始解析', regexes.join('\n'))
   // 缓存内容行以 lineSeparator 连接, 逐行累计字符偏移
   const entries: { title: string; beginChar: number }[] = []
   let offset = 0
