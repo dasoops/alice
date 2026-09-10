@@ -1,7 +1,7 @@
 import { lineSeparator } from '../../constants'
 import type { Chapter } from '../book'
 
-// 含全文字符偏移的章节, txt 内部定位专用, 不进入共享 Chapter
+// 含全文字符偏移的章节; extends 共享 Chapter, 运行时经 Book.chapters 对外可见
 export type TxtChapter = Chapter & {
   beginChar: number
   endChar: number

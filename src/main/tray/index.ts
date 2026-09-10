@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, Menu, shell, Tray } from 'electron'
 import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
 import { configDir, error } from '../util'
-import { Config as ReaderConfig, Reader } from '../reader'
+import { Reader } from '../reader'
 import type { Book, Chapter } from '../reader'
 import { Config as WebDavConfig } from '../webdav'
 import path from 'path'
@@ -17,7 +17,6 @@ export type Handler = {
 
 export class TrayManager {
   private readonly conf: {
-    reader: Conf<ReaderConfig>
     window: Conf<WindowConfig>
     webdav: Conf<WebDavConfig>
   }
@@ -36,7 +35,6 @@ export class TrayManager {
     handler
   }: {
     conf: {
-      reader: Conf<ReaderConfig>
       window: Conf<WindowConfig>
       webdav: Conf<WebDavConfig>
     }
@@ -154,12 +152,12 @@ export class TrayManager {
 
   async openReadFile(): Promise<void> {
     await this.initlization
-    await shell.openPath(this.conf.reader.get('file'))
+    await shell.openPath((await this.reader.book()).path)
   }
 
   async openReadFileDir(): Promise<void> {
     await this.initlization
-    await shell.openPath(path.dirname(this.conf.reader.get('file')))
+    await shell.openPath(path.dirname((await this.reader.book()).path))
   }
 
   async openShortcutConfigFile(): Promise<void> {
@@ -263,7 +261,7 @@ export class TrayManager {
       ]
     })
     if (canceled) return
-    this.conf.reader.set('file', filePaths[0])
+    await this.reader.setFile(filePaths[0])
   }
 
   async togglePenetrate(value: boolean): Promise<void> {

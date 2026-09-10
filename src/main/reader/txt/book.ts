@@ -1,70 +1,70 @@
+import { EventEmitter } from 'node:events'
 import { lineSeparator } from '../../constants'
-import type { Book as BaseBook, Chapter, PageOptions, Position } from '../book'
+import type { Book as BaseBook, BookEvents, Chapter, PageOptions, Position } from '../book'
 import { pageRange } from '../paging'
 import { findChapterAt, type TxtChapter } from './toc'
 
-// 全文文本 + 全局字符 index 是 txt 的独有定位模型, 全部封装在内部;
-// 对外仅暴露跨格式统一的 {chapterIndex, chapterPos} 定位
-export class Book implements BaseBook {
+export class Book extends EventEmitter<BookEvents> implements BaseBook {
   readonly type = 'txt' as const
   readonly path: string
   readonly name: string
   readonly author = ''
-  readonly chapters: Chapter[]
   readonly content: string
 
-  private readonly offsetChapters: TxtChapter[]
+  readonly chapters: TxtChapter[]
   private index = 0
-  private chapter?: TxtChapter
+
+  // 首章前或 toc 为空时为 undefined
+  private _chapter?: TxtChapter
 
   constructor({
     filePath,
     name,
     content,
-    offsetChapters
+    chapters
   }: {
     filePath: string
     name: string
     content: string
-    offsetChapters: TxtChapter[]
+    chapters: TxtChapter[]
   }) {
+    super()
     this.path = filePath
     this.name = name
     this.content = content
-    this.offsetChapters = offsetChapters
-    this.chapters = offsetChapters.map(({ index, title }) => ({ index, title }))
+    this.chapters = chapters
   }
 
   position(): Position {
-    const chapter = this.resolveChapter()
-    if (!chapter) return { chapterIndex: 0, chapterPos: this.index }
-    return { chapterIndex: chapter.index, chapterPos: this.index - chapter.beginChar }
+    if (!this._chapter) return { chapterIndex: 0, chapterPos: this.index }
+    return { chapterIndex: this._chapter.index, chapterPos: this.index - this._chapter.beginChar }
   }
 
   setPosition({ chapterIndex, chapterPos }: Position): void {
     // 无章节表时全书视为单章, 章内位置即字符位置
-    if (this.offsetChapters.length === 0) {
+    if (this.chapters.length === 0) {
       this.index = chapterPos
+      this.syncChapter()
       return
     }
     let chapter = this.chapterAt(chapterIndex)
     // 章内越界保持既有跳转行为: 超章尾切下章头, 无下章(末章)时停在章尾
     if (chapter.beginChar + chapterPos > chapter.endChar) {
-      chapter = this.offsetChapters.find((it) => it.index === chapter.index + 1) ?? chapter
+      chapter = this.chapters.find((it) => it.index === chapter.index + 1) ?? chapter
     }
     const target = Math.min(chapter.beginChar + chapterPos, chapter.endChar)
     this.index = Math.max(target, chapter.beginChar)
-    this.chapter = chapter
+    this.syncChapter()
   }
 
-  currentChapter(): Chapter | undefined {
-    const chapter = this.resolveChapter()
-    return chapter ? { index: chapter.index, title: chapter.title } : undefined
+  chapter(): Chapter | undefined {
+    return this._chapter
   }
 
   readPage(offset: number, options: PageOptions): string {
     const { begin, end } = pageRange(this.content, this.index, offset, options)
     this.index = begin
+    this.syncChapter()
     return this.content.substring(begin, end)
   }
 
@@ -89,18 +89,21 @@ export class Book implements BaseBook {
       index++
     }
     this.index = index
+    this.syncChapter()
     return index
   }
 
-  private chapterAt(chapterIndex: number): TxtChapter {
-    if (chapterIndex < 0) return this.offsetChapters[0]
-    if (chapterIndex > this.offsetChapters.length - 1) return this.offsetChapters.at(-1)!
-    return this.offsetChapters.find((it) => it.index === chapterIndex) ?? this.offsetChapters[0]
+  private syncChapter(): void {
+    const previous = this._chapter
+    const current = findChapterAt(this.chapters, this.index, previous)
+    if (current === previous) return
+    this._chapter = current
+    this.emit('chapter', current, previous)
   }
 
-  // 最近包含字符 index 的章节, 命中已知当前章时跳过遍历
-  private resolveChapter(index: number = this.index): TxtChapter | undefined {
-    this.chapter = findChapterAt(this.offsetChapters, index, this.chapter)
-    return this.chapter
+  private chapterAt(chapterIndex: number): TxtChapter {
+    if (chapterIndex < 0) return this.chapters[0]
+    if (chapterIndex > this.chapters.length - 1) return this.chapters.at(-1)!
+    return this.chapters.find((it) => it.index === chapterIndex) ?? this.chapters[0]
   }
 }

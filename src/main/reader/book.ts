@@ -1,4 +1,4 @@
-import type { PathLike } from 'node:fs'
+import EventEmitter from 'node:events'
 
 export type BookType = 'txt' | 'epub'
 
@@ -20,15 +20,22 @@ export type Chapter = {
   title: string
 }
 
-export interface Book {
+// 事件映射, 声明后 emit/on 参数受类型约束
+export type BookEvents = {
+  // 跨章时 emit 'chapter'(current, previous)
+  chapter: [current: Chapter | undefined, previous: Chapter | undefined]
+}
+
+// 当前章节由 book 内部随定位维护
+export interface Book extends EventEmitter<BookEvents> {
   readonly type: BookType
-  readonly path: PathLike
+  readonly path: string
   readonly name: string
   readonly author: string
   readonly chapters: Chapter[]
   position(): Position
   setPosition(pos: Position): void
-  currentChapter(): Chapter | undefined
+  chapter(): Chapter | undefined
   // 相对当前定位返回一页文本并更新定位; offset 为 0 时读取当前页
   readPage(offset: number, options: PageOptions): string
   // 行号能力为 txt 独有, 显式可选; jumpLine 返回新定位或 undefined(行不存在)

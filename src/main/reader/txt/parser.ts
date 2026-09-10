@@ -17,7 +17,7 @@ export class Parser implements BaseParser {
       filePath: this.filePath,
       name: path.basename(this.filePath, path.extname(this.filePath)),
       content,
-      offsetChapters: buildToc(this.chapterRegexes, content)
+      chapters: buildToc(this.chapterRegexes, content)
     })
   }
 }

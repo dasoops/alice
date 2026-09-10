@@ -188,7 +188,7 @@ app.whenReady().then(async () => {
     }
   })
   const trayManager = new TrayManager({
-    conf: { reader: conf.reader, window: conf.window, webdav: conf.webdav },
+    conf: { window: conf.window, webdav: conf.webdav },
     reader: reader,
     mainWindow: mainWindow,
     handler: {
@@ -196,7 +196,7 @@ app.whenReady().then(async () => {
       exit: app.quit
     }
   })
-  for (const it of [reader, shortcutManager, trayManager, reader.progressSync]) {
+  for (const it of [reader, shortcutManager, trayManager]) {
     await it.initlization
   }
 
@@ -210,7 +210,7 @@ app.whenReady().then(async () => {
     // 阻止立即退出, 待进度同步 flush 完成后再退出
     event.preventDefault()
     quitting = true
-    reader.progressSync
+    reader
       .flush()
       .then(() => log.info('App ==> progress flush done, quitting'))
       .finally(() => app.quit())

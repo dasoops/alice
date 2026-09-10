@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { lineSeparator } from '../../constants'
 import { buildToc, compileRegexes } from './toc'
 import { Book } from './book'
+import type { Chapter } from '../book'
 
 const content = ['前言内容', '第1章 开始', '正文A', '第2章 结束', '正文B'].join(lineSeparator)
 // 偏移表: 前言[0,5) 第1章[5,16) 第2章[16,26)
@@ -10,17 +11,17 @@ const makeBook = (): Book =>
     filePath: 'a.txt',
     name: '书名',
     content,
-    offsetChapters: buildToc(compileRegexes(['^\\s*第\\s*\\d+\\s*章']), content)
+    chapters: buildToc(compileRegexes(['^\\s*第\\s*\\d+\\s*章']), content)
   })
 
 const paging = { maxLine: 1, chunkSize: 40 }
 
 describe('Book', () => {
-  it('共享章节表仅暴露 index/title', () => {
+  it('共享章节表直接暴露内部偏移章节', () => {
     expect(makeBook().chapters).toEqual([
-      { index: 0, title: '前言' },
-      { index: 1, title: '第1章 开始' },
-      { index: 2, title: '第2章 结束' }
+      { index: 0, title: '前言', beginChar: 0, endChar: 5 },
+      { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 },
+      { index: 2, title: '第2章 结束', beginChar: 16, endChar: 26 }
     ])
   })
 
@@ -33,7 +34,7 @@ describe('Book', () => {
   })
 
   it('无章节表时全书视为单章, 章内位置即字符位置', () => {
-    const book = new Book({ filePath: 'x', name: 'x', content: 'abc', offsetChapters: [] })
+    const book = new Book({ filePath: 'x', name: 'x', content: 'abc', chapters: [] })
     book.setPosition({ chapterIndex: 3, chapterPos: 2 })
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 2 })
   })
@@ -63,10 +64,26 @@ describe('Book', () => {
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 4 })
   })
 
-  it('currentChapter 反映当前定位', () => {
+  it('chapter 反映当前定位', () => {
     const book = makeBook()
     book.setPosition({ chapterIndex: 1, chapterPos: 2 })
-    expect(book.currentChapter()).toEqual({ index: 1, title: '第1章 开始' })
+    expect(book.chapter()).toEqual({ index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 })
+  })
+
+  it('跨章时 emit chapter 事件, 携带新旧章节', () => {
+    const book = makeBook()
+    const changes: [Chapter | undefined, Chapter | undefined][] = []
+    book.on('chapter', (current, previous) => changes.push([current, previous]))
+    book.setPosition({ chapterIndex: 0, chapterPos: 0 })
+    book.setPosition({ chapterIndex: 1, chapterPos: 0 })
+    book.setPosition({ chapterIndex: 1, chapterPos: 1 })
+    expect(changes).toEqual([
+      [{ index: 0, title: '前言', beginChar: 0, endChar: 5 }, undefined],
+      [
+        { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 },
+        { index: 0, title: '前言', beginChar: 0, endChar: 5 }
+      ]
+    ])
   })
 
   it('行号计算与跳转', () => {

@@ -5,23 +5,23 @@ import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
 import { compileRegexes } from './txt/toc'
-import type { Book, Chapter, Position } from './book'
+import type { Book, BookEvents, Chapter } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
-import { ProgressSync } from './sync/sync'
+import { ProgressSync, type SyncTrigger } from './sync/sync'
+import type { BookProgress, SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
 import type { Config } from './config'
 
-export class Reader extends EventEmitter {
+export class Reader extends EventEmitter<BookEvents> {
   private readonly conf: Conf<Config>
   private readonly mainWindow: BrowserWindow
   private readonly webdav: WebDavClient
-  public readonly progressSync: ProgressSync
+  private readonly progressSync: ProgressSync
+  private readonly mode: SyncMode
   public initlization: Promise<void>
-  // load 完成前为空, 外部须先 await book()
-  public _book?: Book
-  // 当前章节; 首章前或 toc 为空时为 undefined, 外部须先 await chapter()
-  public _chapter?: Chapter
+  private warnedNoChapter = false
+  private _book?: Book
 
   constructor({
     conf,
@@ -36,9 +36,9 @@ export class Reader extends EventEmitter {
     this.conf = conf
     this.mainWindow = mainWindow
     this.webdav = webdav
+    this.mode = conf.get('sync')?.mode ?? 'approximate'
     this.progressSync = new ProgressSync({
-      mode: conf.get('sync')?.mode ?? 'approximate',
-      reader: this,
+      mode: this.mode,
       webdav: this.webdav,
       mainWindow: mainWindow
     })
@@ -46,52 +46,39 @@ export class Reader extends EventEmitter {
     this.initlization = this.init()
   }
 
-  // 外部规范访问入口, 保证 initlization 完成后返回已加载的书
   public async book(): Promise<Book> {
     await this.initlization
     if (!this._book) throw Error('unexpected')
     return this._book
   }
 
-  // 当前章节规范访问入口, 保证 initlization 完成后返回确定值(首章前或 toc 空时为 undefined)
   public async chapter(): Promise<Chapter | undefined> {
-    await this.initlization
-    return this._chapter
+    return (await this.book()).chapter()
+  }
+
+  public async setFile(path: string): Promise<void> {
+    if (!path) throw Error('无效文件路径')
+    this.conf.set('file', path)
+    this.conf.reset('position')
+    await this.load(path)
+    this.mainWindow.webContents.send('refresh-content')
   }
 
   private async init(): Promise<void> {
     log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
     await this.load(this.conf.get('file'))
-    this.refreshChapter()
-    this.conf.onDidChange('position', (newValue) => {
-      if (!newValue || typeof newValue !== 'object') throw Error('unexpected')
-      this._book?.setPosition(newValue as Position)
-      this.refreshChapter()
-    })
-    this.conf.onDidChange('file', async (newValue) => {
-      if (!newValue) throw Error('unexpected')
-      // clear
-      this.conf.reset('position')
-      await this.load(newValue as string)
-      // load 重建了 toc, 以新 toc 重算当前章节, 避免残留旧书的章节
-      this.refreshChapter()
-      this.mainWindow.webContents.send('refresh-content')
-    })
     ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
       log.debug('on reader:read')
       return await this.read(offset)
     })
+    // hide 仅推送(远端领先时静默跳过)
+    this.mainWindow.on('hide', () => this.fireSync({ pull: false, push: true }))
+    // show 完整同步(窗口可见时可弹恢复确认)
+    this.mainWindow.on('show', () => this.fireSync({ pull: true, push: true }))
+    this.on('chapter', () => this.fireSync({ pull: true, push: true }))
+    this.fireSync({ pull: true, push: true })
     log.info(`Reader <== init ok.`)
-  }
-
-  // 重算当前章节, 跨章时 emit 'chapter'; 首章前或 toc 为空时 chapter 为 undefined
-  private refreshChapter(): void {
-    const previous = this._chapter
-    const current = this._book?.currentChapter()
-    if (current?.index === previous?.index) return
-    this._chapter = current
-    this.emit('chapter', current, previous)
   }
 
   private async load(filePath: PathLike): Promise<void> {
@@ -100,6 +87,10 @@ export class Reader extends EventEmitter {
     this._book = await createParser(String(filePath), {
       txtChapterRegexes: this.chapterRegexes()
     }).parse()
+    // 转发 book 章节事件, 供 tray 重建菜单与进度同步使用
+    this._book.on('chapter', (chapter: Chapter | undefined, previous: Chapter | undefined) => {
+      this.emit('chapter', chapter, previous)
+    })
     this._book.setPosition(this.conf.get('position'))
   }
 
@@ -159,5 +150,56 @@ export class Reader extends EventEmitter {
     book.setPosition({ chapterIndex: index, chapterPos: position })
     this.conf.set('position', book.position())
     this.mainWindow.webContents.send('refresh-content')
+  }
+
+  // 触发一次同步, 失败仅记日志不阻塞阅读
+  private fireSync(trigger: SyncTrigger): void {
+    this.sync(trigger).catch((err) => {
+      log.warn(`WebDavSync ==> sync failed: ${err}`)
+    })
+  }
+
+  // before-quit 时调用, await 完成, 仅推送不弹恢复确认
+  public async flush(): Promise<void> {
+    try {
+      await this.sync({ pull: false, push: true })
+    } catch (err) {
+      log.warn(`WebDavSync ==> flush failed: ${err}`)
+    }
+  }
+
+  private async sync(trigger: SyncTrigger): Promise<void> {
+    const book = await this.book()
+    const chapters = book.chapters
+    if (chapters.length === 0) {
+      if (!this.warnedNoChapter) {
+        this.warnedNoChapter = true
+        error('章节表为空, WebDav 同步已禁用')
+      }
+      return
+    }
+
+    const local = this.localProgress(book)
+    const remote = await this.progressSync.sync(book, local, trigger)
+    if (!remote) return
+
+    // chapter 模式仅恢复章节信息, 跳转到章节头
+    const position = this.mode === 'chapter' ? 0 : remote.durChapterPos
+    await this.jumpChapter(remote.durChapterIndex, position)
+  }
+
+  private localProgress(book: Book): BookProgress {
+    // 当前章由 book 内部随定位维护, 即当前定位所在章节;
+    // 首章前或 toc 为空时为 undefined, 此时回退 0 值进度
+    const position = book.position()
+    const chapter = book.chapter()
+    return {
+      name: book.name,
+      author: book.author,
+      durChapterIndex: position.chapterIndex,
+      durChapterPos: this.mode === 'chapter' || !chapter ? 0 : position.chapterPos,
+      durChapterTime: Date.now(),
+      durChapterTitle: chapter?.title ?? ''
+    }
   }
 }
