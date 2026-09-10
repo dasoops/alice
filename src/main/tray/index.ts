@@ -256,6 +256,10 @@ export class TrayManager {
         {
           name: '文本文档',
           extensions: ['txt']
+        },
+        {
+          name: 'Epub 电子书',
+          extensions: ['epub']
         }
       ]
     })

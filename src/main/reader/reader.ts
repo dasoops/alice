@@ -1,5 +1,6 @@
 import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
+import path from 'node:path'
 import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
@@ -10,7 +11,7 @@ import { WebDavClient } from '../webdav'
 import { ProgressSync, type SyncTrigger } from './sync/sync'
 import type { BookProgress, SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
-import type { Config } from './config'
+import { Config } from './config'
 
 export class Reader extends EventEmitter<BookEvents> {
   private readonly conf: Conf<Config>
@@ -82,7 +83,14 @@ export class Reader extends EventEmitter<BookEvents> {
   }
 
   private async load(filePath: PathLike): Promise<void> {
-    if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
+    if (!fs.existsSync(filePath)) {
+      // epub 缺失时无法生成占位文件, 回退默认文本文件避免启动崩溃
+      if (path.extname(String(filePath)).toLowerCase() === '.epub') {
+        error('Epub 文件不存在, 已回退到默认文本文件')
+        filePath = Config.Default.file
+      }
+      fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
+    }
 
     this._book = await createParser(String(filePath), this.conf).parse()
     // 转发 book 章节事件, 供 tray 重建菜单与进度同步使用
