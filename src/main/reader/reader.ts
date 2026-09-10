@@ -4,7 +4,6 @@ import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
-import { compileRegexes } from './txt/toc'
 import type { Book, BookEvents, Chapter } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
@@ -84,20 +83,12 @@ export class Reader extends EventEmitter<BookEvents> {
   private async load(filePath: PathLike): Promise<void> {
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
 
-    this._book = await createParser(String(filePath), {
-      txtChapterRegexes: this.chapterRegexes()
-    }).parse()
+    this._book = await createParser(String(filePath), this.conf).parse()
     // 转发 book 章节事件, 供 tray 重建菜单与进度同步使用
     this._book.on('chapter', (chapter: Chapter | undefined, previous: Chapter | undefined) => {
       this.emit('chapter', chapter, previous)
     })
     this._book.setPosition(this.conf.get('position'))
-  }
-
-  private chapterRegexes(): RegExp[] {
-    return compileRegexes(this.conf.get('txt')?.chapterRegex ?? [], (pattern) =>
-      error(`无效的章节正则: ${pattern}`)
-    )
   }
 
   async read(offset: number): Promise<string> {

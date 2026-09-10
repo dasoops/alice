@@ -1,12 +1,19 @@
 import * as fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { compileRegexes } from './toc'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Conf } from 'electron-conf'
 import { lineSeparator } from '../../constants'
 import { createParser } from '../parser'
 import { Parser } from './parser'
 import { Book } from './book'
+import type { Config } from '../config'
+
+// parser 经 util 间接依赖 electron 的 app/ipcMain, 测试环境无 electron 运行时
+vi.mock('electron', () => ({
+  app: { getPath: () => '/tmp' },
+  ipcMain: { emit: vi.fn() }
+}))
 
 describe('Parser', () => {
   let dir: string
@@ -27,7 +34,7 @@ describe('Parser', () => {
 
   it('归一化正文并按正则构建章节表', async () => {
     const filePath = write('书名.txt', '前言\r\n第1章 开始\n正文A\r\n第2章 结束\r\n正文B')
-    const parsed = await new Parser(filePath, compileRegexes(['^\\s*第\\s*\\d+\\s*章'])).parse()
+    const parsed = await new Parser(filePath, { chapterRegex: ['^\\s*第\\s*\\d+\\s*章'] }).parse()
 
     expect(parsed.type).toBe('txt')
     expect(parsed.name).toBe('书名')
@@ -41,7 +48,7 @@ describe('Parser', () => {
 
   it('无匹配章节时章节表为空', async () => {
     const filePath = write('无章节.txt', '只有正文')
-    const parsed = await new Parser(filePath, compileRegexes(['^第\\d+章'])).parse()
+    const parsed = await new Parser(filePath, { chapterRegex: ['^第\\d+章'] }).parse()
     expect(parsed.chapters).toEqual([])
     expect((parsed as Book).content).toBe('只有正文')
   })
@@ -62,7 +69,9 @@ describe('createParser', () => {
     for (const name of ['a.txt', 'b.cache', 'c']) {
       const filePath = path.join(dir, name)
       fs.writeFileSync(filePath, '正文', 'utf-8')
-      const parser = createParser(filePath, { txtChapterRegexes: [] })
+      const parser = createParser(filePath, {
+        get: () => ({ chapterRegex: [] })
+      } as unknown as Conf<Config>)
       expect(parser).toBeInstanceOf(Parser)
       const parsed = await parser.parse()
       expect(parsed.type).toBe('txt')

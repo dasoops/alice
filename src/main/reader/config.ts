@@ -3,12 +3,14 @@ import { dataDir } from '../util'
 import type { Position } from './book'
 import type { SyncMode } from './sync/progress'
 
+export type TxtConfig = { chapterRegex: string[] }
+
 export type Config = {
   file: string
   position: Position
   chunkSize: number
   maxLine: number
-  txt: { chapterRegex: string[] }
+  txt: TxtConfig
   sync: { mode: SyncMode }
 }
 
