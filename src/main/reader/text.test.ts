@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lineSeparator } from '../../constants'
+import { lineSeparator } from '../constants'
 import { normalizeText } from './text'
 
 describe('normalizeText', () => {

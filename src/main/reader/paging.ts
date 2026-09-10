@@ -1,7 +1,7 @@
 import { lineSeparator } from '../constants'
 
 // 从 index 出发沿 sign 方向推进, 移动 maxLine 行或 chunkSize 字符(先到为准)
-function nextPage(
+export function nextPage(
   content: string,
   from: number,
   step: number,
