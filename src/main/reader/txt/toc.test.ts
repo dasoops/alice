@@ -1,28 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 import { lineSeparator } from '../../constants'
-import { buildToc, compileChapterRegexes } from './toc'
+import { buildToc, compileRegexes, findChapterAt } from './toc'
 
 describe('compileChapterRegexes', () => {
   it('编译全部有效正则', () => {
-    const regexes = compileChapterRegexes(['^第\\d+章', '^\\s*第\\s*\\d+\\s*章'])
+    const regexes = compileRegexes(['^第\\d+章', '^\\s*第\\s*\\d+\\s*章'])
     expect(regexes).toHaveLength(2)
     expect(regexes[0].test('第1章 开始')).toBe(true)
   })
 
   it('跳过无效正则并回调上报', () => {
     const onInvalid = vi.fn()
-    const regexes = compileChapterRegexes(['^第\\d+章', '[无效'], onInvalid)
+    const regexes = compileRegexes(['^第\\d+章', '[无效'], onInvalid)
     expect(regexes).toHaveLength(1)
     expect(onInvalid).toHaveBeenCalledWith('[无效')
   })
 
   it('全部无效时返回空数组', () => {
-    expect(compileChapterRegexes(['[a-', '('])).toHaveLength(0)
+    expect(compileRegexes(['[a-', '('])).toHaveLength(0)
   })
 })
 
 describe('buildToc', () => {
-  const defaultRegexes = compileChapterRegexes(['^\\s*第\\s*\\d+\\s*章'])
+  const defaultRegexes = compileRegexes(['^\\s*第\\s*\\d+\\s*章'])
 
   it('无正则时返回空目录', () => {
     expect(buildToc([], '第1章 开始' + lineSeparator)).toEqual([])
@@ -86,15 +86,49 @@ describe('buildToc', () => {
 
   it('空行不参与匹配', () => {
     // 空行虽为空串, 即使正则可匹配空串也应被排除
-    const regexes = compileChapterRegexes(['^$'])
+    const regexes = compileRegexes(['^$'])
     expect(buildToc(regexes, '正文' + lineSeparator + lineSeparator + '正文')).toEqual([])
   })
 
   it('多个正则时任一匹配即认定标题', () => {
-    const regexes = compileChapterRegexes(['^\\s*第\\s*\\d+\\s*章', '^楔子'])
+    const regexes = compileRegexes(['^\\s*第\\s*\\d+\\s*章', '^楔子'])
     const content = '楔子' + lineSeparator + '正文' + lineSeparator + '第1章 开始'
     const chapters = buildToc(regexes, content)
     expect(chapters.map((it) => it.title)).toEqual(['楔子', '第1章 开始'])
     expect(chapters[1].index).toBe(1)
+  })
+})
+
+describe('findChapterAt', () => {
+  const chapters = [
+    { index: 0, title: '前言', beginChar: 0, endChar: 5 },
+    { index: 1, title: '第1章', beginChar: 5, endChar: 16 },
+    { index: 2, title: '第2章', beginChar: 16, endChar: 26 }
+  ]
+
+  it('命中章节内部', () => {
+    expect(findChapterAt(chapters, 7)?.title).toBe('第1章')
+    expect(findChapterAt(chapters, 20)?.title).toBe('第2章')
+  })
+
+  it('边界偏移归属下一章(左闭右开)', () => {
+    expect(findChapterAt(chapters, 5)?.title).toBe('第1章')
+    expect(findChapterAt(chapters, 16)?.title).toBe('第2章')
+  })
+
+  it('首章前返回 undefined', () => {
+    expect(findChapterAt(chapters, -1)).toBeUndefined()
+  })
+
+  it('末章末尾(全文末尾)仍属于末章', () => {
+    expect(findChapterAt(chapters, 25)?.title).toBe('第2章')
+  })
+
+  it('空 toc 返回 undefined', () => {
+    expect(findChapterAt([], 10)).toBeUndefined()
+  })
+
+  it('命中已知当前章时跳过遍历', () => {
+    expect(findChapterAt(chapters, 7, chapters[1])?.title).toBe('第1章')
   })
 })

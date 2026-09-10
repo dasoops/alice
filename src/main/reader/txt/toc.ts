@@ -1,7 +1,13 @@
 import { lineSeparator } from '../../constants'
-import type { Chapter } from '../chapter'
+import type { Chapter } from '../book'
 
-export function compileChapterRegexes(
+// 含全文字符偏移的章节, txt 内部定位专用, 不进入共享 Chapter
+export type TxtChapter = Chapter & {
+  beginChar: number
+  endChar: number
+}
+
+export function compileRegexes(
   patterns: string[],
   onInvalid?: (pattern: string) => void
 ): RegExp[] {
@@ -16,7 +22,7 @@ export function compileChapterRegexes(
   return regexes
 }
 
-export function buildToc(regexes: RegExp[], content: string): Chapter[] {
+export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
   if (regexes.length === 0) return []
 
   // 缓存内容行以 lineSeparator 连接, 逐行累计字符偏移
@@ -30,7 +36,7 @@ export function buildToc(regexes: RegExp[], content: string): Chapter[] {
   }
   if (entries.length === 0) return []
 
-  const chapters: Chapter[] = []
+  const chapters: TxtChapter[] = []
   // 首个标题行之前的非空内容作为第 0 章
   if (content.substring(0, entries[0].beginChar).trim().length > 0) {
     chapters.push({ index: 0, title: '前言', beginChar: 0, endChar: entries[0].beginChar })
@@ -44,4 +50,20 @@ export function buildToc(regexes: RegExp[], content: string): Chapter[] {
     })
   }
   return chapters
+}
+
+// 最近包含 index 的章节; 区间为 [beginChar, endChar), index 在首章前或 toc 为空时为 undefined
+// current 为调用方已知的当前章, 命中时跳过遍历
+export function findChapterAt(
+  chapters: TxtChapter[],
+  index: number,
+  current?: TxtChapter
+): TxtChapter | undefined {
+  if (current && index >= current.beginChar && index < current.endChar) return current
+  let chapter: TxtChapter | undefined
+  for (const it of chapters) {
+    if (index < it.beginChar) break
+    chapter = it
+  }
+  return chapter
 }

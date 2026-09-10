@@ -1,10 +1,11 @@
 import path from 'path'
 import { dataDir } from '../util'
-import type { SyncMode } from './progress'
+import type { Position } from './book'
+import type { SyncMode } from './sync/progress'
 
 export type Config = {
   file: string
-  index: number
+  position: Position
   chunkSize: number
   maxLine: number
   txt: { chapterRegex: string[] }
@@ -14,7 +15,7 @@ export type Config = {
 export const Config: { Default: Config } = {
   Default: {
     file: path.join(dataDir, 'read.txt'),
-    index: 0,
+    position: { chapterIndex: 0, chapterPos: 0 },
     maxLine: 1,
     chunkSize: 40,
     txt: {

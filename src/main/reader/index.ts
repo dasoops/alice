@@ -1,5 +1,4 @@
 export { Config } from './config'
 export { Reader } from './reader'
-export { createParser } from './parser'
-export type { Parser, BookType, Book } from './parser'
-export type { Chapter } from './chapter'
+export type { Parser, BookType, Book, Position } from './parser'
+export type { Chapter } from './book'

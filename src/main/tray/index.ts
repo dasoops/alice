@@ -3,6 +3,7 @@ import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
 import { configDir, error } from '../util'
 import { Config as ReaderConfig, Reader } from '../reader'
+import type { Book, Chapter } from '../reader'
 import { Config as WebDavConfig } from '../webdav'
 import path from 'path'
 import log from 'electron-log/main'
@@ -56,7 +57,7 @@ export class TrayManager {
     await this.create0()
 
     // 章节变化(菜单点击/快捷键/翻页跨章等)时重建菜单,
-    this.reader.on('chapter', () => this.refreshContextMenu())
+    this.reader.on('chapter', () => this.refreshContextMenu().then(null))
     this.mainWindow.on('show', () => this.create())
     this.mainWindow.on('hide', () => this.destroy())
     log.info(`TrayManager ==> init ok`)
@@ -74,18 +75,19 @@ export class TrayManager {
     this.tray.setToolTip('Alice')
     this.tray.on('click', this.handler.toggleDisplay)
 
-    await this.reader.initlization
-    this.refreshContextMenu()
+    await this.reader.book()
+    await this.refreshContextMenu()
   }
 
-  private refreshContextMenu(): void {
+  private async refreshContextMenu(): Promise<void> {
     if (!this.tray) return
-    this.tray.setContextMenu(this.buildMenu())
+    const book = await this.reader.book()
+    const chapter = await this.reader.chapter()
+    this.tray.setContextMenu(this.buildMenu(book, chapter))
   }
 
-  private buildMenu(): Menu {
-    const chapter = this.reader.chapter
-    const chapters = this.reader.book.chapters
+  private buildMenu(book: Book, chapter: Chapter | undefined): Menu {
+    const chapters = book.chapters
     const chapterItems = chapters.map((it) => {
       // 章节标题超 20 字符截断
       const label = it.title.length > 20 ? `${it.title.substring(0, 20)}…` : it.title
@@ -100,7 +102,11 @@ export class TrayManager {
     })
 
     return Menu.buildFromTemplate([
-      { label: '跳转行数', click: () => this.showJumpDialog() },
+      {
+        label: '跳转行数',
+        enabled: book.type === 'txt',
+        click: () => this.showJumpDialog()
+      },
       {
         label: '跳转章节',
         enabled: chapterItems.length > 0,
@@ -205,16 +211,16 @@ export class TrayManager {
 
   async showJumpChapterDialog(): Promise<void> {
     await this.initlization
-    await this.reader.initlization
 
-    const chapters = this.reader.book.chapters
+    const book = await this.reader.book()
+    const chapters = book.chapters
     if (chapters.length === 0) {
       error('未识别到章节')
       return
     }
 
     // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
-    const current = Math.max(this.reader.chapter?.index ?? -1, 0)
+    const current = Math.max((await this.reader.chapter())?.index ?? -1, 0)
     const maxChapterInedx = chapters.length - 1
     const chapterInput = await prompt(
       {
@@ -270,7 +276,7 @@ export class TrayManager {
     const { url, username, password } = this.conf.webdav.store
     if (value && (!url || !username || !password)) {
       // 不写入 enabled, 重建菜单复位勾选显示
-      this.refreshContextMenu()
+      await this.refreshContextMenu()
       error('请先在 webdav.json 配置 url/username/password')
       return
     }

@@ -1,9 +1,5 @@
 import { BrowserWindow, dialog } from 'electron'
-import { Conf } from 'electron-conf'
 import log from 'electron-log/main'
-import type { Config as ReaderConfig } from './config'
-import type { Reader } from './reader'
-import { WebDavClient } from '../webdav'
 import {
   bookProgressFileName,
   compareProgress,
@@ -11,13 +7,15 @@ import {
   type BookProgress,
   type SyncMode
 } from './progress'
-import { error } from '../util'
+import { Reader } from '../reader'
+import { error } from '../../util'
+import { WebDavClient } from '../../webdav'
 
 // interactive: 允许与用户交互(弹窗确认恢复远端进度); silent: 静默, 远端领先时直接跳过
 type SyncTrigger = 'interactive' | 'silent'
 
 export class ProgressSync {
-  private readonly conf: Conf<ReaderConfig>
+  private readonly mode: SyncMode
   private readonly reader: Reader
   private readonly webdav: WebDavClient
   private readonly mainWindow: BrowserWindow
@@ -31,17 +29,17 @@ export class ProgressSync {
   private pendingMode?: SyncTrigger
 
   constructor({
-    conf,
+    mode,
     reader,
     webdav,
     mainWindow
   }: {
-    conf: Conf<ReaderConfig>
+    mode: SyncMode
     reader: Reader
     webdav: WebDavClient
     mainWindow: BrowserWindow
   }) {
-    this.conf = conf
+    this.mode = mode
     this.reader = reader
     this.webdav = webdav
     this.mainWindow = mainWindow
@@ -112,17 +110,17 @@ export class ProgressSync {
 
     // 前置约束: legado 未配置规则会自动选规则/拆分超长章节, 导致序号错位
     await this.reader.initlization
-    const chapters = this.reader.book.chapters
-    if (this.conf.get('txt')?.chapterRegex.length === 0 || chapters.length === 0) {
+    const book = await this.reader.book()
+    const chapters = book.chapters
+    if (chapters.length === 0) {
       if (!this.warnedNoChapter) {
         this.warnedNoChapter = true
-        error('未配置章节规则或章节表为空, WebDav 同步已禁用')
+        error('章节表为空, WebDav 同步已禁用')
       }
       return
     }
 
     // name 决定远端文件名, 为空会生成 "_.json" 污染远端目录
-    const book = this.reader.book
     if (!book.name) {
       // name 决定远端文件名, 为空会生成 "_.json" 污染远端目录
       log.warn('WebDavSync ==> book name empty, sync skipped')
@@ -134,33 +132,28 @@ export class ProgressSync {
     const local = await this.localProgress(book)
     const remote = await this.fetchRemote(book)
 
-    if (remote && compareProgress(this.syncMode(), remote, local) > 0) {
+    if (remote && compareProgress(this.mode, remote, local) > 0) {
       if (!this.canPrompt(mode)) return
       await this.restoreRemote(remote)
       return
     }
     // 远端无进度或本地领先 → 上传; 相等 → 不动
-    if (!remote || compareProgress(this.syncMode(), local, remote) > 0) {
+    if (!remote || compareProgress(this.mode, local, remote) > 0) {
       await this.webdav.put(this.progressPath(book), JSON.stringify(local))
     }
   }
 
-  // 同步粒度: chapter 模式只同步章节信息, 上传位置恒为 0 且比较忽略章内位置
-  private syncMode(): SyncMode {
-    return this.conf.get('sync')?.mode ?? 'approximate'
-  }
-
   private async localProgress(book: BookMeta): Promise<BookProgress> {
-    await this.reader.initlization
-    // reader.chapter 随 conf index 变化同步维护, 即当前 index 所在章节;
-    // index 在首章前或 toc 为空时回退 0 值进度
-    const chapter = this.reader.chapter
+    const current = await this.reader.book()
+    // reader.chapter() 随 conf position 变化同步维护, 即当前定位所在章节;
+    // 首章前或 toc 为空时回退 0 值进度
+    const chapter = await this.reader.chapter()
+    const position = current.position()
     return {
       name: book.name,
       author: book.author,
-      durChapterIndex: chapter?.index ?? 0,
-      durChapterPos:
-        this.syncMode() === 'chapter' || !chapter ? 0 : this.reader.index - chapter.beginChar,
+      durChapterIndex: position.chapterIndex,
+      durChapterPos: this.mode === 'chapter' || !chapter ? 0 : position.chapterPos,
       durChapterTime: Date.now(),
       durChapterTitle: chapter?.title ?? ''
     }
@@ -185,7 +178,7 @@ export class ProgressSync {
     if (response !== 0) return
 
     // chapter 模式仅恢复章节信息, 跳转到章节头
-    const position = this.syncMode() === 'chapter' ? 0 : remote.durChapterPos
+    const position = this.mode === 'chapter' ? 0 : remote.durChapterPos
     await this.reader.jumpChapter(remote.durChapterIndex, position)
   }
 }
