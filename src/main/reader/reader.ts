@@ -103,22 +103,13 @@ export class Reader extends EventEmitter<BookEvents> {
     return string
   }
 
-  async currentLine(): Promise<number> {
+  async lines(): Promise<{ current: number; total: number }> {
     const book = await this.book()
-    if (!book.currentLine) {
+    if (!book.lines) {
       error('仅文本文件支持行号')
-      return 0
+      throw Error('仅文本文件支持行号')
     }
-    return book.currentLine()
-  }
-
-  async totalLine(): Promise<number> {
-    const book = await this.book()
-    if (!book.totalLine) {
-      error('仅文本文件支持行号')
-      return 0
-    }
-    return book.totalLine()
+    return book.lines()
   }
 
   async jumpLine(value: number): Promise<void> {

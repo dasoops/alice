@@ -68,12 +68,11 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     return this.content.substring(begin, end)
   }
 
-  currentLine(): number {
-    return this.content.substring(0, this.index + 1).split(lineSeparator).length
-  }
-
-  totalLine(): number {
-    return this.content.split(lineSeparator).length
+  lines(): { current: number; total: number } {
+    return {
+      current: this.content.substring(0, this.index + 1).split(lineSeparator).length,
+      total: this.content.split(lineSeparator).length
+    }
   }
 
   jumpLine(line: number): number | undefined {

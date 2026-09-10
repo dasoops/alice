@@ -178,18 +178,17 @@ export class TrayManager {
   async showJumpDialog(): Promise<void> {
     await this.initlization
 
-    const currentLine = await this.reader.currentLine()
-    const totalLine = await this.reader.totalLine()
+    const { current, total } = await this.reader.lines()
     const pageInput = await prompt(
       {
         icon: icon,
         title: `选择页码`,
-        label: `请输入缓存文件行号 (1 - ${totalLine})`,
-        value: currentLine.toString(),
+        label: `请输入缓存文件行号 (1 - ${total})`,
+        value: current.toString(),
         inputAttrs: {
           type: 'number',
           min: '0',
-          max: totalLine.toString()
+          max: total.toString()
         },
         type: 'input',
         width: 440,

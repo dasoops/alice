@@ -38,8 +38,8 @@ export interface Book extends EventEmitter<BookEvents> {
   chapter(): Chapter | undefined
   // 相对当前定位返回一页文本并更新定位; offset 为 0 时读取当前页
   readPage(offset: number, options: PageOptions): string
-  // 行号能力为 txt 独有, 显式可选; jumpLine 返回新定位或 undefined(行不存在)
-  currentLine?(): number
-  totalLine?(): number
+  // lines / jumpLine txt 独有, 显式可选
+  lines?(): { current: number; total: number }
+  // 返回新定位或 undefined(行不存在)
   jumpLine?(line: number): number | undefined
 }

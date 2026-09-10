@@ -88,7 +88,7 @@ describe('Book', () => {
 
   it('行号计算与跳转', () => {
     const book = makeBook()
-    expect(book.totalLine()).toBe(5)
+    expect(book.lines!().total).toBe(5)
     expect(book.jumpLine!(1)).toBe(0)
     expect(book.jumpLine!(4)).toBe(16)
     expect(book.position()).toEqual({ chapterIndex: 2, chapterPos: 0 })
