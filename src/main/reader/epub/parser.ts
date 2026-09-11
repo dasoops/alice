@@ -5,6 +5,7 @@ import type { Book, Parser as BaseParser } from '../parser'
 import { Book as EpubBook, type EpubChapter } from './book'
 import { htmlToText } from './html'
 import { flattenToc } from './toc'
+import log from 'electron-log/main'
 
 export class Parser implements BaseParser {
   constructor(
@@ -25,6 +26,7 @@ export class Parser implements BaseParser {
 
   private async build(epub: EpubFile): Promise<Book> {
     const metadata = epub.getMetadata()
+    log.debug('EpubParser ==> metadata: ' + JSON.stringify(metadata))
     const titleById = flattenToc(epub.getToc())
     const chapters: EpubChapter[] = []
     for (const item of epub.getSpine()) {
@@ -44,8 +46,8 @@ export class Parser implements BaseParser {
     }
     return new EpubBook({
       filePath: this.filePath,
-      name: metadata.title || path.basename(this.filePath, path.extname(this.filePath)),
-      author: metadata.creator?.[0]?.contributor ?? '',
+      name: metadata?.title || path.basename(this.filePath, path.extname(this.filePath)),
+      author: metadata?.creator?.[0]?.contributor ?? '',
       chapters
     })
   }
