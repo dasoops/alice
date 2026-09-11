@@ -4,12 +4,12 @@ import path from 'node:path'
 import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { Book, BookEvents, Chapter } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
 import { ProgressSync, type SyncTrigger } from './sync/sync'
-import type { BookProgress, SyncMode } from './sync/progress'
+import { compareProgress, type BookProgress, type SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
 import { Config } from './config'
 
@@ -21,6 +21,8 @@ export class Reader extends EventEmitter<BookEvents> {
   private readonly mode: SyncMode
   public initlization: Promise<void>
   private warnedNoChapter = false
+  // 已弹窗确认/静默跳过的远端进度快照; 用户忽略后, 相同远端的重复同步不再打扰
+  private promptedRemote?: BookProgress
   private _book?: Book
 
   constructor({
@@ -39,8 +41,7 @@ export class Reader extends EventEmitter<BookEvents> {
     this.mode = conf.get('sync')?.mode ?? 'approximate'
     this.progressSync = new ProgressSync({
       mode: this.mode,
-      webdav: this.webdav,
-      mainWindow: mainWindow
+      webdav: this.webdav
     })
 
     this.initlization = this.init()
@@ -60,7 +61,7 @@ export class Reader extends EventEmitter<BookEvents> {
     if (!path) throw Error('无效文件路径')
     this.conf.set('file', path)
     this.conf.reset('position')
-    this.progressSync.reset()
+    this.promptedRemote = undefined
     await this.load(path)
     this.mainWindow.webContents.send('refresh-content')
   }
@@ -172,6 +173,21 @@ export class Reader extends EventEmitter<BookEvents> {
 
     const remote = await this.progressSync.sync(book, () => this.localProgress(book), trigger)
     if (!remote) return
+
+    // 已就同一远端进度弹过窗(用户忽略), 不重复打扰; 远端变化时重新弹窗
+    if (this.promptedRemote && compareProgress(this.mode, remote, this.promptedRemote) === 0) {
+      return
+    }
+    this.promptedRemote = remote
+
+    const { response } = await dialog.showMessageBox(this.mainWindow, {
+      type: 'question',
+      title: 'WebDav 同步',
+      message: '远端阅读进度领先, 是否恢复?',
+      detail: `远端进度: ${remote.durChapterTitle}`,
+      buttons: ['恢复远端进度', '忽略']
+    })
+    if (response !== 0) return
 
     // chapter 模式仅恢复章节信息, 跳转到章节头
     log.info('WebDavSync ==> 同步远端进度')
