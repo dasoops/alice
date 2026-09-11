@@ -5,6 +5,7 @@ import type { Book, Parser as BaseParser } from '../parser'
 import { Book as EpubBook, type EpubChapter } from './book'
 import { htmlToText } from './html'
 import { flattenToc } from './toc'
+import { buildEpubLegadoMap } from './adapter'
 import log from 'electron-log/main'
 
 export class Parser implements BaseParser {
@@ -42,10 +43,13 @@ export class Parser implements BaseParser {
         id: item.id,
         index,
         title: titleById.get(item.id) ?? this.fallbackTitle(item.href, index),
-        text,
-        // TODO: 按 legado 章节表换算 index(封面/卷首页/fragment 切章差异), 暂与本地 index 对齐
-        legadoIndex: index
+        text
       })
+    }
+    // 本地章节可能因跳过 linear=no/空正文而与 legado 章节表错位, 经 adapter 换算每章 legadoIndex
+    const legadoMap = buildEpubLegadoMap(epub)
+    for (const chapter of chapters) {
+      chapter.legadoIndex = legadoMap.toLegadoById(chapter.id)
     }
     return new EpubBook({
       filePath: this.filePath,
