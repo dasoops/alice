@@ -50,13 +50,13 @@ describe('Book', () => {
 
   it('下一页触章尾时切换到下章首页', () => {
     const book = makeBook()
-    const changes: [Chapter | undefined, Chapter | undefined][] = []
+    const changes: [Chapter, Chapter | undefined][] = []
     book.on('chapter', (current, previous) => changes.push([current, previous]))
     book.setPosition({ chapterIndex: 0, chapterPos: text1.length })
     expect(book.readPage(1, paging)).toBe('第二章内容C')
     expect(book.position()).toEqual({ chapterIndex: 1, chapterPos: 0 })
+    // 构造即定位于首章, 初始 setPosition 同章不触发事件
     expect(changes).toEqual([
-      [{ index: 0, title: '第1章', id: 'c1', text: text1 }, undefined],
       [
         { index: 1, title: '第2章', id: 'c2', text: text2 },
         { index: 0, title: '第1章', id: 'c1', text: text1 }
@@ -82,13 +82,6 @@ describe('Book', () => {
     book.setPosition({ chapterIndex: 1, chapterPos: text2.length })
     expect(book.readPage(1, paging)).toBe('\n第二章内容D')
     expect(book.position()).toEqual({ chapterIndex: 1, chapterPos: 6 })
-  })
-
-  it('无章节时返回空串且定位保持默认', () => {
-    const book = new Book({ filePath: 'x.epub', name: 'x', author: '', chapters: [] })
-    expect(book.readPage(0, paging)).toBe('')
-    expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 0 })
-    expect(book.chapter()).toBeUndefined()
   })
 
   it('章末页起点向后翻页应切到下章', () => {

@@ -17,7 +17,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
 
   private chapterIndex = 0
   private chapterPos = 0
-  private _chapter?: EpubChapter
+  private _chapter: EpubChapter
 
   constructor({
     filePath,
@@ -35,6 +35,8 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     this.name = name
     this.author = author
     this.chapters = chapters
+    if (chapters.length === 0) throw Error('epub 章节表为空')
+    this._chapter = chapters[0]
   }
 
   position(): Position {
@@ -42,7 +44,6 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   }
 
   setPosition({ chapterIndex, chapterPos }: Position): void {
-    if (this.chapters.length === 0) return
     const index = this.clampChapterIndex(chapterIndex)
     this.chapterIndex = index
     this.chapterPos = Math.min(Math.max(chapterPos, 0), this.chapters[index].text.length)
@@ -55,12 +56,11 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     return chapterIndex
   }
 
-  chapter(): Chapter | undefined {
+  chapter(): Chapter {
     return this._chapter
   }
 
   readPage(offset: number, options: PageOptions): string {
-    if (this.chapters.length === 0) return ''
     const chapter = this.chapters[this.chapterIndex]
     if (offset > 0) {
       // 下一页起点越过章尾即已在章末页, 切换到下一章

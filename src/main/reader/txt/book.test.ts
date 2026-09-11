@@ -33,12 +33,6 @@ describe('Book', () => {
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 3 })
   })
 
-  it('无章节表时全书视为单章, 章内位置即字符位置', () => {
-    const book = new Book({ filePath: 'x', name: 'x', content: 'abc', chapters: [] })
-    book.setPosition({ chapterIndex: 3, chapterPos: 2 })
-    expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 2 })
-  })
-
   it('chapterIndex 越界时 clamp 到首/末章', () => {
     const book = makeBook()
     book.setPosition({ chapterIndex: -1, chapterPos: 0 })
@@ -78,13 +72,13 @@ describe('Book', () => {
 
   it('跨章时 emit chapter 事件, 携带新旧章节', () => {
     const book = makeBook()
-    const changes: [Chapter | undefined, Chapter | undefined][] = []
+    const changes: [Chapter, Chapter | undefined][] = []
     book.on('chapter', (current, previous) => changes.push([current, previous]))
     book.setPosition({ chapterIndex: 0, chapterPos: 0 })
     book.setPosition({ chapterIndex: 1, chapterPos: 0 })
     book.setPosition({ chapterIndex: 1, chapterPos: 1 })
+    // 构造即定位于首章, 初始同章 setPosition 不触发事件
     expect(changes).toEqual([
-      [{ index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 }, undefined],
       [
         { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16, legadoIndex: 1 },
         { index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 }

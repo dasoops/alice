@@ -16,7 +16,7 @@ export type Config = {
 
 export const Config: { Default: Config } = {
   Default: {
-    file: path.join(dataDir, 'read.txt'),
+    file: path.join(dataDir, 'notFound.txt'),
     position: { chapterIndex: 0, chapterPos: 0 },
     maxLine: 1,
     chunkSize: 40,

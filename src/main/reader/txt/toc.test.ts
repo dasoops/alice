@@ -24,12 +24,16 @@ describe('compileChapterRegexes', () => {
 describe('buildToc', () => {
   const defaultRegexes = compileRegexes(['^\\s*第\\s*\\d+\\s*章'])
 
-  it('无正则时返回空目录', () => {
-    expect(buildToc([], '第1章 开始' + lineSeparator)).toEqual([])
+  it('无正则时全书作为单章', () => {
+    expect(buildToc([], '第1章 开始' + lineSeparator)).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: 7, legadoIndex: 0 }
+    ])
   })
 
-  it('无匹配标题时返回空目录', () => {
-    expect(buildToc(defaultRegexes, '正文一' + lineSeparator + '正文二')).toEqual([])
+  it('无匹配标题时全书作为单章', () => {
+    expect(buildToc(defaultRegexes, '正文一' + lineSeparator + '正文二')).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: 7, legadoIndex: 0 }
+    ])
   })
 
   it('解析多个章节并正确计算偏移', () => {
@@ -64,12 +68,12 @@ describe('buildToc', () => {
     expect(chapters).toHaveLength(2)
   })
 
-  it('首个标题前仅有空白时不生成前言章节', () => {
+  it('首章前仅有空白时生成空白前言章, 其后正文章节 legadoIndex 偏移', () => {
     const content = lineSeparator + lineSeparator + '第1章 开始' + lineSeparator + '正文'
-    const chapters = buildToc(defaultRegexes, content)
-    expect(chapters).toHaveLength(1)
-    expect(chapters[0].title).toBe('第1章 开始')
-    expect(chapters[0].beginChar).toBe(2)
+    expect(buildToc(defaultRegexes, content)).toEqual([
+      { index: 0, title: '前言', beginChar: 0, endChar: 2, legadoIndex: undefined },
+      { index: 1, title: '第1章 开始', beginChar: 2, endChar: content.length, legadoIndex: 0 }
+    ])
   })
 
   it('兼容无空格的章节标题', () => {
@@ -81,13 +85,18 @@ describe('buildToc', () => {
 
   it('正则锚定行首, 行中出现标题样式不匹配', () => {
     const content = '文中提到第1章的内容' + lineSeparator + '正文'
-    expect(buildToc(defaultRegexes, content)).toEqual([])
+    expect(buildToc(defaultRegexes, content)).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: content.length, legadoIndex: 0 }
+    ])
   })
 
   it('空行不参与匹配', () => {
     // 空行虽为空串, 即使正则可匹配空串也应被排除
     const regexes = compileRegexes(['^$'])
-    expect(buildToc(regexes, '正文' + lineSeparator + lineSeparator + '正文')).toEqual([])
+    const content = '正文' + lineSeparator + lineSeparator + '正文'
+    expect(buildToc(regexes, content)).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: content.length, legadoIndex: 0 }
+    ])
   })
 
   it('多个正则时任一匹配即认定标题', () => {

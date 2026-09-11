@@ -14,8 +14,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   readonly chapters: TxtChapter[]
   private index = 0
 
-  // 首章前可能为空
-  private _chapter?: TxtChapter
+  private _chapter: TxtChapter
 
   constructor({
     filePath,
@@ -33,20 +32,15 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     this.name = name
     this.content = content
     this.chapters = chapters
+    if (chapters.length === 0) throw Error('txt 章节表为空')
+    this._chapter = chapters[0]
   }
 
   position(): Position {
-    if (!this._chapter) return { chapterIndex: 0, chapterPos: this.index }
     return { chapterIndex: this._chapter.index, chapterPos: this.index - this._chapter.beginChar }
   }
 
   setPosition({ chapterIndex, chapterPos }: Position): void {
-    // 无章节表时全书视为单章, 章内位置即字符位置
-    if (this.chapters.length === 0) {
-      this.index = chapterPos
-      this.syncChapter()
-      return
-    }
     let chapter = this.chapterAt(chapterIndex)
     // 章内越界保持既有跳转行为: 超章尾切下章头, 无下章(末章)时停在章尾
     if (chapter.beginChar + chapterPos > chapter.endChar) {
@@ -57,7 +51,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     this.syncChapter()
   }
 
-  chapter(): Chapter | undefined {
+  chapter(): Chapter {
     return this._chapter
   }
 
@@ -95,7 +89,8 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   private syncChapter(): void {
     const previous = this._chapter
     const current = findChapterAt(this.chapters, this.index, previous)
-    if (current === previous) return
+    // 首章 beginChar 恒为 0, 定位 index>=0 时必有章节, !current 仅为类型防御
+    if (!current || current === previous) return
     this._chapter = current
     this.emit('chapter', current, previous)
   }

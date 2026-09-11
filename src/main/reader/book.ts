@@ -18,14 +18,15 @@ export type PageOptions = {
 export type Chapter = {
   index: number
   title: string
-  // legado 侧章节 index, 与 legado BookProgress.durChapterIndex 对齐; txt 直接等于 index, epub 暂为 index(TODO 按 legado 章节表换算)
+  // legado 侧章节 index, 与 legado BookProgress.durChapterIndex 对齐
+  // 当无匹配章节时为空
   legadoIndex?: number
 }
 
 // 事件映射, 声明后 emit/on 参数受类型约束
 export type BookEvents = {
   // 跨章时 emit 'chapter'(current, previous)
-  chapter: [current: Chapter | undefined, previous: Chapter | undefined]
+  chapter: [current: Chapter, previous: Chapter | undefined]
 }
 
 // 当前章节由 book 内部随定位维护
@@ -37,7 +38,7 @@ export interface Book extends EventEmitter<BookEvents> {
   readonly chapters: Chapter[]
   position(): Position
   setPosition(pos: Position): void
-  chapter(): Chapter | undefined
+  chapter(): Chapter
   // 相对当前定位返回一页文本并更新定位; offset 为 0 时读取当前页
   readPage(offset: number, options: PageOptions): string
   // lines / jumpLine txt 独有, 显式可选

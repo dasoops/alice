@@ -1,6 +1,5 @@
 import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
-import path from 'node:path'
 import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
@@ -20,7 +19,6 @@ export class Reader extends EventEmitter<BookEvents> {
   private readonly progressSync: ProgressSync
   private readonly mode: SyncMode
   public initlization: Promise<void>
-  private warnedNoChapter = false
   // 已弹窗确认/静默跳过的远端进度快照; 用户忽略后, 相同远端的重复同步不再打扰
   private promptedRemote?: BookProgress
   private _book?: Book
@@ -53,23 +51,39 @@ export class Reader extends EventEmitter<BookEvents> {
     return this._book
   }
 
-  public async chapter(): Promise<Chapter | undefined> {
+  public async chapter(): Promise<Chapter> {
     return (await this.book()).chapter()
   }
 
   public async setFile(path: string): Promise<void> {
     if (!path) throw Error('无效文件路径')
+    const previous = this.conf.get('file')
     this.conf.set('file', path)
     this.conf.reset('position')
     this.promptedRemote = undefined
-    await this.load(path)
+    try {
+      await this.load(path)
+    } catch (err) {
+      // 解析失败(如 epub 无正文章节)回滚文件配置, 保持旧书, 阻止切换
+      this.conf.set('file', previous)
+      error(`无法打开书籍: ${path}`)
+      log.warn(`Reader ==> 打开书籍失败: ${err}`)
+      return
+    }
     this.mainWindow.webContents.send('refresh-content')
   }
 
   private async init(): Promise<void> {
     log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
-    await this.load(this.conf.get('file'))
+    try {
+      await this.load(this.conf.get('file'))
+    } catch (err) {
+      // 初始书籍解析失败(如 epub 无正文章节)回退默认文本, 避免应用无法启动
+      log.warn(`Reader ==> 初始书籍加载失败, 回退默认文本: ${err}`)
+      this.conf.set('file', Config.Default.file)
+      await this.load(Config.Default.file)
+    }
     ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
       log.debug('on reader:read')
       return await this.read(offset)
@@ -85,17 +99,13 @@ export class Reader extends EventEmitter<BookEvents> {
 
   private async load(filePath: PathLike): Promise<void> {
     if (!fs.existsSync(filePath)) {
-      // epub 缺失时无法生成占位文件, 回退默认文本文件避免启动崩溃
-      if (path.extname(String(filePath)).toLowerCase() === '.epub') {
-        error('Epub 文件不存在, 已回退到默认文本文件')
-        filePath = Config.Default.file
-      }
+      filePath = Config.Default.file
       fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
     }
 
     this._book = await createParser(String(filePath), this.conf).parse()
     // 转发 book 章节事件, 供 tray 重建菜单与进度同步使用
-    this._book.on('chapter', (chapter: Chapter | undefined, previous: Chapter | undefined) => {
+    this._book.on('chapter', (chapter: Chapter, previous: Chapter | undefined) => {
       this.emit('chapter', chapter, previous)
     })
     this._book.setPosition(this.conf.get('position'))
@@ -135,10 +145,6 @@ export class Reader extends EventEmitter<BookEvents> {
 
   async jumpChapter(index: number, position: number = 0): Promise<void> {
     const book = await this.book()
-    if (book.chapters.length === 0) {
-      error('未识别到章节')
-      return
-    }
     book.setPosition({ chapterIndex: index, chapterPos: position })
     this.conf.set('position', book.position())
     this.mainWindow.webContents.send('refresh-content')
@@ -162,14 +168,6 @@ export class Reader extends EventEmitter<BookEvents> {
 
   private async sync(trigger: SyncTrigger): Promise<void> {
     const book = await this.book()
-    const chapters = book.chapters
-    if (chapters.length === 0) {
-      if (!this.warnedNoChapter) {
-        this.warnedNoChapter = true
-        error('章节表为空, WebDav 同步已禁用')
-      }
-      return
-    }
 
     const remote = await this.progressSync.sync(book, () => this.localProgress(book), trigger)
     if (!remote) return
@@ -216,11 +214,11 @@ export class Reader extends EventEmitter<BookEvents> {
     return {
       name: book.name,
       author: book.author,
-      // TODO: 按 legado 章节表换算(封面/卷首页/fragment 差异), 当前 legadoIndex 暂与本地 index 一致
-      durChapterIndex: chapter?.legadoIndex ?? position.chapterIndex,
-      durChapterPos: this.mode === 'chapter' || !chapter ? 0 : position.chapterPos,
+      // legadoIndex 由 parser 按 legado 章节表换算; 空白前言等 legado 无对应章节时回退本地 index
+      durChapterIndex: chapter.legadoIndex ?? position.chapterIndex,
+      durChapterPos: this.mode === 'chapter' ? 0 : position.chapterPos,
       durChapterTime: Date.now(),
-      durChapterTitle: chapter?.title ?? ''
+      durChapterTitle: chapter.title
     }
   }
 }

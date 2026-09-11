@@ -84,7 +84,7 @@ export class TrayManager {
     this.tray.setContextMenu(this.buildMenu(book, chapter))
   }
 
-  private buildMenu(book: Book, chapter: Chapter | undefined): Menu {
+  private buildMenu(book: Book, chapter: Chapter): Menu {
     const chapters = book.chapters
     const chapterItems = chapters.map((it) => {
       // 章节标题超 20 字符截断
@@ -92,7 +92,7 @@ export class TrayManager {
       return {
         label: label,
         type: 'checkbox' as const,
-        checked: it.index === chapter?.index,
+        checked: it.index === chapter.index,
         click: (): void => {
           this.jumpChapter(it.index).then(null)
         }
@@ -217,7 +217,7 @@ export class TrayManager {
     }
 
     // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
-    const current = Math.max((await this.reader.chapter())?.index ?? -1, 0)
+    const current = Math.max((await this.reader.chapter()).index, 0)
     const maxChapterInedx = chapters.length - 1
     const chapterInput = await prompt(
       {

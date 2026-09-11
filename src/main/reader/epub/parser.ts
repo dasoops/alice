@@ -46,6 +46,10 @@ export class Parser implements BaseParser {
         text
       })
     }
+    // 无可读正文(全为 linear=no/空正文)视为无效书籍, 抛异常阻止切换
+    if (chapters.length === 0) {
+      throw Error('epub 无正文章节')
+    }
     // 本地章节可能因跳过 linear=no/空正文而与 legado 章节表错位, 经 adapter 换算每章 legadoIndex
     const legadoMap = buildEpubLegadoMap(epub)
     for (const chapter of chapters) {

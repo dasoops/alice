@@ -25,8 +25,8 @@ export function compileRegexes(
 
 export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
   if (regexes.length === 0) {
-    log.warn('TxtParser ==> 章节正则列表为空, 无法解析章节')
-    return []
+    log.warn('TxtParser ==> 章节正则列表为空, 全书作为单章')
+    return [wholeBookChapter(content)]
   }
 
   log.debug('TxtParser ==> 章节正则列表: %s, 开始解析', regexes.join('\n'))
@@ -39,19 +39,23 @@ export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
     }
     offset += line.length + 1
   }
-  if (entries.length === 0) return []
+  if (entries.length === 0) {
+    log.warn('TxtParser ==> 未匹配到章节标题, 全书作为单章')
+    return [wholeBookChapter(content)]
+  }
 
   const chapters: TxtChapter[] = []
-  // TODO: legadoIndex 暂等于本地 index, 仅在两端章节表一致时成立;
-  // legado 的正则来源/超长章节拆分/分卷/无规则回退均可能造成差异(见 TextFile.kt)
-  // 首个标题行之前的非空内容作为第 0 章
-  if (content.substring(0, entries[0].beginChar).trim().length > 0) {
+  // 首个标题行之前的内容作为 第 0 章 前言, 空白(空行)也占位, 保证任意定位都落入章节;
+  // legado 仅在首章前非空白时生成前言(TextFile isNotBlank), 空白前言章在 legado 无对应
+  let blankPreface = false
+  if (entries[0].beginChar > 0) {
+    blankPreface = content.substring(0, entries[0].beginChar).trim().length === 0
     chapters.push({
       index: 0,
       title: '前言',
       beginChar: 0,
       endChar: entries[0].beginChar,
-      legadoIndex: 0
+      legadoIndex: blankPreface ? undefined : 0
     })
   }
   for (let i = 0; i < entries.length; i++) {
@@ -61,10 +65,17 @@ export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
       title: entries[i].title,
       beginChar: entries[i].beginChar,
       endChar: i + 1 < entries.length ? entries[i + 1].beginChar : content.length,
-      legadoIndex: index
+      // 空白前言占位章使本地正文章节相对 legado 后移 1, 其余情况(无前言/非空白前言)恒等
+      legadoIndex: index - (blankPreface ? 1 : 0)
     })
   }
   return chapters
+}
+
+// 无正则/无匹配时全书作为固定单章, 保证始终有可读章节;
+// 与 legado 无规则按字节切"第N章"不同, 此处只要求章节可读, 不做字节切分
+function wholeBookChapter(content: string): TxtChapter {
+  return { index: 0, title: '正文', beginChar: 0, endChar: content.length, legadoIndex: 0 }
 }
 
 // 最近包含 index 的章节; 区间为 [beginChar, endChar), index 在首章前或 toc 为空时为 undefined

@@ -44,12 +44,16 @@ describe('Parser', () => {
       ['前言', '第1章 开始', '正文A', '第2章 结束', '正文B'].join(lineSeparator)
     )
     expect(parsed.chapters.map((it) => it.title)).toEqual(['前言', '第1章 开始', '第2章 结束'])
+    // 前提 T1 下 txt 与 legado 章节表一致, legadoIndex 恒等于本地 index
+    expect(parsed.chapters.map((it) => it.legadoIndex)).toEqual([0, 1, 2])
   })
 
-  it('无匹配章节时章节表为空', async () => {
+  it('无匹配章节时全书作为单章', async () => {
     const filePath = write('无章节.txt', '只有正文')
     const parsed = await new Parser(filePath, { chapterRegex: ['^第\\d+章'] }).parse()
-    expect(parsed.chapters).toEqual([])
+    expect(parsed.chapters).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: 4, legadoIndex: 0 }
+    ])
     expect((parsed as Book).content).toBe('只有正文')
   })
 })
