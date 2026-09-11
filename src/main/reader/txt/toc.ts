@@ -42,16 +42,26 @@ export function buildToc(regexes: RegExp[], content: string): TxtChapter[] {
   if (entries.length === 0) return []
 
   const chapters: TxtChapter[] = []
+  // TODO: legadoIndex 暂等于本地 index, 仅在两端章节表一致时成立;
+  // legado 的正则来源/超长章节拆分/分卷/无规则回退均可能造成差异(见 TextFile.kt)
   // 首个标题行之前的非空内容作为第 0 章
   if (content.substring(0, entries[0].beginChar).trim().length > 0) {
-    chapters.push({ index: 0, title: '前言', beginChar: 0, endChar: entries[0].beginChar })
+    chapters.push({
+      index: 0,
+      title: '前言',
+      beginChar: 0,
+      endChar: entries[0].beginChar,
+      legadoIndex: 0
+    })
   }
   for (let i = 0; i < entries.length; i++) {
+    const index = chapters.length
     chapters.push({
-      index: chapters.length,
+      index,
       title: entries[i].title,
       beginChar: entries[i].beginChar,
-      endChar: i + 1 < entries.length ? entries[i + 1].beginChar : content.length
+      endChar: i + 1 < entries.length ? entries[i + 1].beginChar : content.length,
+      legadoIndex: index
     })
   }
   return chapters

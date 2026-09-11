@@ -180,6 +180,14 @@ export class Reader extends EventEmitter<BookEvents> {
     }
     this.promptedRemote = remote
 
+    // 远端 durChapterIndex 为 legado 侧 index, 翻译为本地章节 index
+    const chapterIndex = this.toLocalIndex(book, remote.durChapterIndex)
+    // 本地没有对应章节: 不弹恢复确认, 静默失败并记录错误
+    if (chapterIndex === undefined) {
+      log.error('WebDavSync ==> 本地章节表未覆盖远端进度, 跳过恢复: ' + JSON.stringify(remote))
+      return
+    }
+
     const { response } = await dialog.showMessageBox(this.mainWindow, {
       type: 'question',
       title: 'WebDav 同步',
@@ -191,8 +199,13 @@ export class Reader extends EventEmitter<BookEvents> {
 
     // chapter 模式仅恢复章节信息, 跳转到章节头
     log.info('WebDavSync ==> 同步远端进度')
-    const position = this.mode === 'chapter' ? 0 : remote.durChapterPos
-    await this.jumpChapter(remote.durChapterIndex, position)
+    await this.jumpChapter(chapterIndex, this.mode === 'chapter' ? 0 : remote.durChapterPos)
+  }
+
+  // 远端 durChapterIndex 为 legado 侧 index, 翻译为本地章节 index;
+  // 本地章节 legadoIndex 为空表示无对应远端目录章节, 不参与匹配; 整体无匹配时返回 undefined
+  private toLocalIndex(book: Book, legadoIndex: number): number | undefined {
+    return book.chapters.find((chapter) => chapter.legadoIndex === legadoIndex)?.index
   }
 
   private localProgress(book: Book): BookProgress {
@@ -203,7 +216,8 @@ export class Reader extends EventEmitter<BookEvents> {
     return {
       name: book.name,
       author: book.author,
-      durChapterIndex: position.chapterIndex,
+      // TODO: 按 legado 章节表换算(封面/卷首页/fragment 差异), 当前 legadoIndex 暂与本地 index 一致
+      durChapterIndex: chapter?.legadoIndex ?? position.chapterIndex,
       durChapterPos: this.mode === 'chapter' || !chapter ? 0 : position.chapterPos,
       durChapterTime: Date.now(),
       durChapterTitle: chapter?.title ?? ''

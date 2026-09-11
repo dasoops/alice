@@ -18,6 +18,8 @@ export type PageOptions = {
 export type Chapter = {
   index: number
   title: string
+  // legado 侧章节 index, 与 legado BookProgress.durChapterIndex 对齐; txt 直接等于 index, epub 暂为 index(TODO 按 legado 章节表换算)
+  legadoIndex?: number
 }
 
 // 事件映射, 声明后 emit/on 参数受类型约束

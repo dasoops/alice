@@ -44,9 +44,9 @@ describe('buildToc', () => {
       lineSeparator +
       '正文B'
     expect(buildToc(defaultRegexes, content)).toEqual([
-      { index: 0, title: '前言', beginChar: 0, endChar: 5 },
-      { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 },
-      { index: 2, title: '第2章 结束', beginChar: 16, endChar: 26 }
+      { index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 },
+      { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16, legadoIndex: 1 },
+      { index: 2, title: '第2章 结束', beginChar: 16, endChar: 26, legadoIndex: 2 }
     ])
   })
 
@@ -101,9 +101,9 @@ describe('buildToc', () => {
 
 describe('findChapterAt', () => {
   const chapters = [
-    { index: 0, title: '前言', beginChar: 0, endChar: 5 },
-    { index: 1, title: '第1章', beginChar: 5, endChar: 16 },
-    { index: 2, title: '第2章', beginChar: 16, endChar: 26 }
+    { index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 },
+    { index: 1, title: '第1章', beginChar: 5, endChar: 16, legadoIndex: 1 },
+    { index: 2, title: '第2章', beginChar: 16, endChar: 26, legadoIndex: 2 }
   ]
 
   it('命中章节内部', () => {

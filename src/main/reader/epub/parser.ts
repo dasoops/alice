@@ -37,11 +37,14 @@ export class Parser implements BaseParser {
       const text = htmlToText(chapter.html)
       // 纯封面/图片等无文本章节跳过, 避免死页
       if (text.length === 0) continue
+      const index = chapters.length
       chapters.push({
         id: item.id,
-        index: chapters.length,
-        title: titleById.get(item.id) ?? this.fallbackTitle(item.href, chapters.length),
-        text
+        index,
+        title: titleById.get(item.id) ?? this.fallbackTitle(item.href, index),
+        text,
+        // TODO: 按 legado 章节表换算 index(封面/卷首页/fragment 切章差异), 暂与本地 index 对齐
+        legadoIndex: index
       })
     }
     return new EpubBook({

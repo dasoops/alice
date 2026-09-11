@@ -14,7 +14,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   readonly chapters: TxtChapter[]
   private index = 0
 
-  // 首章前或 toc 为空时为 undefined
+  // 首章前可能为空
   private _chapter?: TxtChapter
 
   constructor({

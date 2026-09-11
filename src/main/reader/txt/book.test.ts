@@ -19,9 +19,9 @@ const paging = { maxLine: 1, chunkSize: 40 }
 describe('Book', () => {
   it('共享章节表直接暴露内部偏移章节', () => {
     expect(makeBook().chapters).toEqual([
-      { index: 0, title: '前言', beginChar: 0, endChar: 5 },
-      { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 },
-      { index: 2, title: '第2章 结束', beginChar: 16, endChar: 26 }
+      { index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 },
+      { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16, legadoIndex: 1 },
+      { index: 2, title: '第2章 结束', beginChar: 16, endChar: 26, legadoIndex: 2 }
     ])
   })
 
@@ -67,7 +67,13 @@ describe('Book', () => {
   it('chapter 反映当前定位', () => {
     const book = makeBook()
     book.setPosition({ chapterIndex: 1, chapterPos: 2 })
-    expect(book.chapter()).toEqual({ index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 })
+    expect(book.chapter()).toEqual({
+      index: 1,
+      title: '第1章 开始',
+      beginChar: 5,
+      endChar: 16,
+      legadoIndex: 1
+    })
   })
 
   it('跨章时 emit chapter 事件, 携带新旧章节', () => {
@@ -78,10 +84,10 @@ describe('Book', () => {
     book.setPosition({ chapterIndex: 1, chapterPos: 0 })
     book.setPosition({ chapterIndex: 1, chapterPos: 1 })
     expect(changes).toEqual([
-      [{ index: 0, title: '前言', beginChar: 0, endChar: 5 }, undefined],
+      [{ index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 }, undefined],
       [
-        { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16 },
-        { index: 0, title: '前言', beginChar: 0, endChar: 5 }
+        { index: 1, title: '第1章 开始', beginChar: 5, endChar: 16, legadoIndex: 1 },
+        { index: 0, title: '前言', beginChar: 0, endChar: 5, legadoIndex: 0 }
       ]
     ])
   })
