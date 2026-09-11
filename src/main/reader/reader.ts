@@ -76,6 +76,12 @@ export class Reader extends EventEmitter<BookEvents> {
   private async init(): Promise<void> {
     log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
+    // 先注册 handler, 避免书籍解析(大 epub 可能较慢)期间渲染进程调用 read 报未注册
+    ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
+      log.debug('on reader:read')
+      return await this.read(offset)
+    })
+
     try {
       await this.load(this.conf.get('file'))
     } catch (err) {
@@ -84,10 +90,6 @@ export class Reader extends EventEmitter<BookEvents> {
       this.conf.set('file', Config.Default.file)
       await this.load(Config.Default.file)
     }
-    ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
-      log.debug('on reader:read')
-      return await this.read(offset)
-    })
     // hide 仅推送(远端领先时静默跳过)
     this.mainWindow.on('hide', () => this.fireSync({ pull: false, push: true }))
     // show 完整同步(窗口可见时可弹恢复确认)
