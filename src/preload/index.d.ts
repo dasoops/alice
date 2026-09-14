@@ -6,6 +6,7 @@ interface Api {
   toggleDisplay: () => void
   reader: {
     read: (offset: number) => Promise<string>
+    fileName: () => Promise<string>
   }
   conf: Conf<Config>
 }

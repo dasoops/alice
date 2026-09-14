@@ -1,5 +1,6 @@
 import { Conf } from 'electron-conf'
 import * as fs from 'node:fs'
+import path from 'node:path'
 import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
@@ -86,6 +87,7 @@ export class Reader extends EventEmitter<BookEvents> {
       log.debug('on reader:read')
       return await this.read(offset)
     })
+    ipcMain.handle('reader:fileName', (): string => path.basename(this.conf.get('file')))
 
     try {
       await this.load(this.conf.get('file'))

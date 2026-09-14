@@ -7,7 +7,8 @@ import { Config } from '../main/reader'
 const api = {
   toggleDisplay: (): void => ipcRenderer.send('toggle-display'),
   reader: {
-    read: (offset: number): Promise<string> => ipcRenderer.invoke('reader:read', offset)
+    read: (offset: number): Promise<string> => ipcRenderer.invoke('reader:read', offset),
+    fileName: (): Promise<string> => ipcRenderer.invoke('reader:fileName')
   },
   conf: new Conf<Config>({ name: 'reader' })
 }

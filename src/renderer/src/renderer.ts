@@ -45,13 +45,23 @@ async function init0(): Promise<void> {
 }
 
 async function changePage(offset: number): Promise<void> {
-  const contentDiv = document.getElementById('content')
-  const content = await api.reader.read(offset)
-  contentDiv!.innerHTML = content
-    .split('\n')
-    .map((it) => it.trim())
-    .filter((it) => it.length > 0)
-    .join(br)
+  const contentDiv = document.getElementById('content')!
+  const loadingDiv = document.getElementById('loading')!
+  // 首次读取需等待主进程解压 epub, 期间展示 loading 避免空白
+  if (contentDiv.innerHTML.length === 0) {
+    loadingDiv.classList.remove('hidden')
+    document.getElementById('loading-text')!.textContent = `正在加载 ${await api.reader.fileName()}`
+  }
+  try {
+    const content = await api.reader.read(offset)
+    contentDiv.innerHTML = content
+      .split('\n')
+      .map((it) => it.trim())
+      .filter((it) => it.length > 0)
+      .join(br)
+  } finally {
+    loadingDiv.classList.add('hidden')
+  }
 }
 
 init()
