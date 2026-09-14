@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { Conf } from 'electron-conf'
@@ -9,6 +9,7 @@ import log from 'electron-log/main'
 import { configDir } from './util'
 import { TrayManager } from './tray'
 import { Store } from './store'
+import { PopupManager } from './popup'
 
 export type WindowConfig = {
   penetrate: boolean
@@ -116,16 +117,6 @@ function createWindow({ conf, store }: { conf: Conf<WindowConfig>; store: Store 
       mainWindow.show()
     }
   })
-  ipcMain.on('error', async (options) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const optionsAny = options as any
-    await dialog.showMessageBox(mainWindow, {
-      type: 'error',
-      title: optionsAny.title || '错误',
-      message: optionsAny.message || '发生错误',
-      buttons: ['确定']
-    })
-  })
   return mainWindow
 }
 
@@ -155,12 +146,30 @@ app.whenReady().then(async () => {
 
   const mainWindow = createWindow({ conf: conf.window, store: store })
 
+  // 独立弹窗模块: 承担全部非文件选择的提示/输入交互
+  const popupManager = new PopupManager({
+    mainWindow: mainWindow,
+    conf: { reader: conf.reader, webdav: conf.webdav, shortcut: conf.shortcut }
+  })
+  app.on('will-quit', () => popupManager.dispose())
+
+  // util.error 走 IPC 通道, 由 popup 呈现错误提示
+  ipcMain.on('error', async (options) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const optionsAny = options as any
+    await popupManager.error({
+      title: optionsAny.title || '错误',
+      message: optionsAny.message || '发生错误'
+    })
+  })
+
   const webdav = new WebDavClient(conf.webdav)
 
   const reader = new Reader({
     conf: conf.reader,
     mainWindow: mainWindow,
-    webdav: webdav
+    webdav: webdav,
+    popup: popupManager
   })
 
   const ipcSend =
@@ -191,6 +200,7 @@ app.whenReady().then(async () => {
     conf: { window: conf.window, webdav: conf.webdav },
     reader: reader,
     mainWindow: mainWindow,
+    popup: popupManager,
     handler: {
       toggleDisplay: toggleDisplay,
       exit: app.quit

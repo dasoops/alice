@@ -1,4 +1,5 @@
 import { defineConfig } from 'electron-vite'
+import { resolve } from 'path'
 
 export default defineConfig({
   main: {
@@ -10,6 +11,24 @@ export default defineConfig({
       }
     }
   },
-  preload: {},
-  renderer: {}
+  preload: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          popup: resolve(__dirname, 'src/preload/popup.ts')
+        }
+      }
+    }
+  },
+  renderer: {
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          popup: resolve(__dirname, 'src/renderer/popup.html')
+        }
+      }
+    }
+  }
 })

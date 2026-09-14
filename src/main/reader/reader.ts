@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import type { Book, BookEvents, Chapter } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
@@ -11,11 +11,13 @@ import { ProgressSync, type SyncTrigger } from './sync/sync'
 import { compareProgress, type BookProgress, type SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
 import { Config } from './config'
+import type { PopupManager } from '../popup'
 
 export class Reader extends EventEmitter<BookEvents> {
   private readonly conf: Conf<Config>
   private readonly mainWindow: BrowserWindow
   private readonly webdav: WebDavClient
+  private readonly popup: PopupManager
   private readonly progressSync: ProgressSync
   private readonly mode: SyncMode
   public initlization: Promise<void>
@@ -26,16 +28,19 @@ export class Reader extends EventEmitter<BookEvents> {
   constructor({
     conf,
     mainWindow,
-    webdav
+    webdav,
+    popup
   }: {
     conf: Conf<Config>
     mainWindow: BrowserWindow
     webdav: WebDavClient
+    popup: PopupManager
   }) {
     super()
     this.conf = conf
     this.mainWindow = mainWindow
     this.webdav = webdav
+    this.popup = popup
     this.mode = conf.get('sync')?.mode ?? 'approximate'
     this.progressSync = new ProgressSync({
       mode: this.mode,
@@ -188,7 +193,7 @@ export class Reader extends EventEmitter<BookEvents> {
       return
     }
 
-    const { response } = await dialog.showMessageBox(this.mainWindow, {
+    const response = await this.popup.message({
       type: 'question',
       title: 'WebDav 同步',
       message: '远端阅读进度领先, 是否恢复?',

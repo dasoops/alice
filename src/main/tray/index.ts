@@ -1,14 +1,14 @@
 import { BrowserWindow, dialog, Menu, shell, Tray } from 'electron'
 import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
-import { configDir, error } from '../util'
+import { error } from '../util'
 import { Reader } from '../reader'
 import type { Book, Chapter } from '../reader'
 import { Config as WebDavConfig } from '../webdav'
 import path from 'path'
 import log from 'electron-log/main'
-import prompt from 'electron-prompt'
 import { WindowConfig } from '../index'
+import type { PopupManager } from '../popup'
 
 export type Handler = {
   toggleDisplay: () => void
@@ -22,6 +22,7 @@ export class TrayManager {
   }
   private readonly reader: Reader
   private readonly mainWindow: BrowserWindow
+  private readonly popup: PopupManager
   private readonly handler: Handler
 
   public initlization: Promise<void>
@@ -32,6 +33,7 @@ export class TrayManager {
     conf,
     reader,
     mainWindow,
+    popup,
     handler
   }: {
     conf: {
@@ -40,11 +42,13 @@ export class TrayManager {
     }
     reader: Reader
     mainWindow: BrowserWindow
+    popup: PopupManager
     handler: Handler
   }) {
     this.conf = conf
     this.reader = reader
     this.mainWindow = mainWindow
+    this.popup = popup
     this.handler = handler
 
     this.initlization = this.init()
@@ -120,9 +124,7 @@ export class TrayManager {
       { label: '打开阅读文件', click: () => this.openReadFile() },
       { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
       { type: 'separator' },
-      { label: '打开快捷键配置文件', click: () => this.openShortcutConfigFile() },
-      { label: '打开配置目录', click: () => this.openConfigDir() },
-      { type: 'separator' },
+      { label: '设置', click: () => this.openSetting() },
       {
         type: 'checkbox',
         label: '鼠标点击穿透',
@@ -160,14 +162,9 @@ export class TrayManager {
     await shell.openPath(path.dirname((await this.reader.book()).path))
   }
 
-  async openShortcutConfigFile(): Promise<void> {
+  async openSetting(): Promise<void> {
     await this.initlization
-    await shell.openPath(path.resolve(configDir, 'shortcut.json'))
-  }
-
-  async openConfigDir(): Promise<void> {
-    await this.initlization
-    await shell.openPath(configDir)
+    await this.popup.settings()
   }
 
   async jumpChapter(index: number): Promise<void> {
@@ -179,23 +176,16 @@ export class TrayManager {
     await this.initlization
 
     const { current, total } = await this.reader.lines()
-    const pageInput = await prompt(
-      {
-        icon: icon,
-        title: `选择页码`,
-        label: `请输入缓存文件行号 (1 - ${total})`,
-        value: current.toString(),
-        inputAttrs: {
-          type: 'number',
-          min: '0',
-          max: total.toString()
-        },
-        type: 'input',
-        width: 440,
-        height: 200
-      },
-      this.mainWindow
-    )
+    const pageInput = await this.popup.prompt({
+      title: `选择页码`,
+      label: `请输入缓存文件行号 (1 - ${total})`,
+      value: current.toString(),
+      inputAttrs: {
+        type: 'number',
+        min: 0,
+        max: total
+      }
+    })
 
     if (!pageInput) return
     const pageNumber = parseInt(pageInput)
@@ -219,23 +209,16 @@ export class TrayManager {
     // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
     const current = Math.max((await this.reader.chapter()).index, 0)
     const maxChapterInedx = chapters.length - 1
-    const chapterInput = await prompt(
-      {
-        icon: icon,
-        title: `选择章节`,
-        label: `请输入章节序号 (0 - ${maxChapterInedx})`,
-        value: current.toString(),
-        inputAttrs: {
-          type: 'number',
-          min: '0',
-          max: maxChapterInedx.toString()
-        },
-        type: 'input',
-        width: 440,
-        height: 200
-      },
-      this.mainWindow
-    )
+    const chapterInput = await this.popup.prompt({
+      title: `选择章节`,
+      label: `请输入章节序号 (0 - ${maxChapterInedx})`,
+      value: current.toString(),
+      inputAttrs: {
+        type: 'number',
+        min: 0,
+        max: maxChapterInedx
+      }
+    })
 
     if (!chapterInput) return
     const chapterIndex = parseInt(chapterInput)
