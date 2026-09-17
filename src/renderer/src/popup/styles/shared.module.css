@@ -1,0 +1,99 @@
+.spacer {
+  flex: 1;
+}
+
+.btn {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-family: var(--font-ui), serif;
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+
+.btn-primary {
+  background: var(--sel);
+  border-color: #3a5f92;
+  color: #dbe6f5;
+}
+
+.btn-primary:hover {
+  background: #2a518f;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+
+.link-btn {
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  font-family: var(--font-ui), serif;
+  font-size: 12px;
+  color: var(--link);
+  cursor: pointer;
+  flex: none;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.link-danger {
+  color: var(--danger-text);
+}
+
+.icon-btn {
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--font-mono), serif;
+  font-size: 13px;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+}
+
+.input {
+  min-width: 0;
+  padding: 5px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-ui), serif;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--number);
+  box-shadow: 0 0 0 2px rgba(104, 151, 187, 0.28);
+}
+
+.input.is-mono {
+  font-family: var(--font-mono), serif;
+}
+
+.input.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(195, 63, 63, 0.3);
+}
+
+.input-flex {
+  flex: 1;
+}

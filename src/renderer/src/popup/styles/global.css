@@ -1,0 +1,115 @@
+:root {
+  color-scheme: dark;
+  /* JetBrains Darcula: 与 Neovim colorscheme / Windows Terminal 方案一致 */
+  --bg: #2b2b2b;
+  --surface: #3c3f41;
+  --surface-2: #323232;
+  --border: #4a4d4f;
+  --fg: #a9b7c6;
+  --muted: #949494;
+  --faint: #606366;
+  --accent: #cc7832;
+  --accent-text: #d68a4a;
+  --number: #6897bb;
+  --type: #769aa5;
+  --link: #5594fa;
+  --danger: #c33f3f;
+  --danger-text: #ea6b6b;
+  --warn: #e0ce70;
+  --sel: #214283;
+  --string: #7fa968;
+  --font-mono:
+    'JetBrains Mono', 'Cascadia Mono', 'Consolas', 'Sarasa Mono SC', 'Microsoft YaHei', monospace;
+  --font-ui:
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui), serif;
+  color: var(--fg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+:focus-visible {
+  outline: 2px solid var(--number);
+  outline-offset: 1px;
+}
+
+/* #popup 为 bootstrap 直接设置 class 的根节点, 布局类需保持全局 */
+#popup {
+  position: absolute;
+  inset: 0;
+}
+
+#popup.mode-band,
+#popup.mode-panel {
+  display: flex;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface);
+  border: 2px solid var(--bg);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 入场动画名需全局可见, 组件 module 内以字面量引用 */
+@keyframes band-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ribbon-in {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
