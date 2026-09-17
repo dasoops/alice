@@ -9,7 +9,7 @@ export const shortcutKeys: { key: keyof ShortcutSettings; label: string }[] = [
 ]
 
 export const syncOptions: { value: ReaderSettings['sync']['mode']; label: string }[] = [
-  { value: 'approximate', label: '同步具体位置(存在误差)' },
+  { value: 'approximate', label: '同步具体位置(跨应用时会存在误差)' },
   { value: 'chapter', label: '仅同步章节' }
 ]
 
