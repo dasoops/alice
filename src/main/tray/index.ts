@@ -93,7 +93,7 @@ export class TrayManager {
         click: () => this.showJumpDialog()
       },
       {
-        label: '跳转章节',
+        label: '章节选择',
         enabled: book.chapters.length > 0,
         click: () => this.showChapterPicker().then(null)
       },

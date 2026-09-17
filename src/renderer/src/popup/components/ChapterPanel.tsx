@@ -67,9 +67,9 @@ export function ChapterPanel({ options }: { options: PopupChapterOptions }): Rea
   }
 
   return (
-    <div className={styles.panel} role="dialog" aria-modal="true" aria-label="跳转章节">
+    <div className={styles.panel} role="dialog" aria-modal="true" aria-label="章节选择">
       <header className={styles.bar}>
-        <span className={styles.title}>跳转章节</span>
+        <span className={styles.title}>章节选择</span>
         {bookName && <span className={styles.book}>{bookName}</span>}
         <span className={styles.count}>
           {keyword ? `${visible.length} 项` : `共 ${chapters.length} 章`}
