@@ -6,6 +6,7 @@ import log from 'electron-log/main'
 import { readSettings, writeSettings, type SettingsConfs } from './schema'
 import { configDir } from '../util'
 import type {
+  PopupChapterOptions,
   PopupInit,
   PopupMessageOptions,
   PopupMode,
@@ -18,6 +19,8 @@ const BAND_MIN_HEIGHT = 56
 const BAND_MAX_HEIGHT = 96
 const PANEL_WIDTH = 760
 const PANEL_HEIGHT = 600
+const CHAPTER_WIDTH = 440
+const CHAPTER_HEIGHT = 560
 const EDGE_GAP = 8
 
 type Bounds = { x: number; y: number; width: number; height: number }
@@ -53,6 +56,11 @@ export class PopupManager {
     return this.open<void>({ mode: 'settings', options, data: readSettings(this.confs) }, undefined)
   }
 
+  // 章节选择面板; 返回选中章节 index, 失焦/取消返回 null
+  public chapters(options: PopupChapterOptions): Promise<number | null> {
+    return this.open<number | null>({ mode: 'chapter', options }, null, true)
+  }
+
   public dispose(): void {
     for (const win of this.windows) {
       if (!win.isDestroyed()) win.destroy()
@@ -60,7 +68,8 @@ export class PopupManager {
     this.windows.clear()
   }
 
-  private open<T>(init: PopupInit, cancelValue: T): Promise<T> {
+  // dismissOnBlur: 窗口失焦即按取消关闭, 用于菜单语义的临时面板(如章节选择)
+  private open<T>(init: PopupInit, cancelValue: T, dismissOnBlur = false): Promise<T> {
     return new Promise<T>((resolve) => {
       log.debug(`open ${init.mode}: ${JSON.stringify(init)}`)
       const win = this.createWindow(init.mode)
@@ -103,6 +112,10 @@ export class PopupManager {
       })
       // 窗口被系统关闭(非按钮)时按取消处理
       win.on('closed', () => settle(cancelValue))
+      // 显示后才监听失焦, 避免展示过程本身触发取消
+      if (dismissOnBlur) {
+        win.once('show', () => win.on('blur', () => settle(cancelValue)))
+      }
     })
   }
 
@@ -145,18 +158,10 @@ export class PopupManager {
     const workArea = screen.getDisplayMatching(main).workArea
 
     if (mode === 'settings') {
-      const width = Math.min(PANEL_WIDTH, workArea.width - EDGE_GAP * 2)
-      const height = Math.min(PANEL_HEIGHT, workArea.height - EDGE_GAP * 2)
-      const x = this.clamp(
-        main.x + Math.round((main.width - width) / 2),
-        workArea.x + EDGE_GAP,
-        workArea.x + workArea.width - width - EDGE_GAP
-      )
-      // 优先贴在阅读条下方, 空间不足则翻到上方, 再不够就居中
-      let y = main.y + main.height + EDGE_GAP
-      if (y + height > workArea.y + workArea.height) y = main.y - EDGE_GAP - height
-      if (y < workArea.y) y = workArea.y + Math.round((workArea.height - height) / 2)
-      return { x, y, width, height }
+      return this.computePanelBounds(workArea, main, PANEL_WIDTH, PANEL_HEIGHT)
+    }
+    if (mode === 'chapter') {
+      return this.computePanelBounds(workArea, main, CHAPTER_WIDTH, CHAPTER_HEIGHT)
     }
 
     const height = Math.min(Math.max(main.height, BAND_MIN_HEIGHT), BAND_MAX_HEIGHT)
@@ -167,6 +172,26 @@ export class PopupManager {
       workArea.y + workArea.height - height
     )
     return { x: main.x, y, width, height }
+  }
+
+  // 优先贴在阅读条下方, 空间不足则翻到上方, 再不够就居中
+  private computePanelBounds(
+    workArea: Bounds,
+    main: Bounds,
+    maxWidth: number,
+    maxHeight: number
+  ): Bounds {
+    const width = Math.min(maxWidth, workArea.width - EDGE_GAP * 2)
+    const height = Math.min(maxHeight, workArea.height - EDGE_GAP * 2)
+    const x = this.clamp(
+      main.x + Math.round((main.width - width) / 2),
+      workArea.x + EDGE_GAP,
+      workArea.x + workArea.width - width - EDGE_GAP
+    )
+    let y = main.y + main.height + EDGE_GAP
+    if (y + height > workArea.y + workArea.height) y = main.y - EDGE_GAP - height
+    if (y < workArea.y) y = workArea.y + Math.round((workArea.height - height) / 2)
+    return { x, y, width, height }
   }
 
   // 内容超出时只增高(向下), 避免与渲染进程测量形成抖动

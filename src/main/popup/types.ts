@@ -2,7 +2,7 @@ import type { Config as ReaderConfig } from '../reader'
 import type { Config as WebDavConfig } from '../webdav'
 import type { Config as ShortcutConfig } from '../shortcut'
 
-export type PopupMode = 'message' | 'prompt' | 'settings'
+export type PopupMode = 'message' | 'prompt' | 'settings' | 'chapter'
 
 export type MessageType = 'info' | 'error' | 'warning' | 'question'
 
@@ -39,6 +39,18 @@ export type PopupPromptOptions = {
 
 export type PopupSettingsOptions = object
 
+// 章节选择面板数据; index 为 toc 序号(含前言为 0), 与本地章节表 / legado 对齐
+export type PopupChapter = {
+  index: number
+  title: string
+}
+
+export type PopupChapterOptions = {
+  bookName?: string
+  chapters: PopupChapter[]
+  current: number
+}
+
 // 与 ReaderConfig 同构(剔除运行状态 position)
 export type ReaderSettings = Omit<ReaderConfig, 'position'>
 
@@ -56,3 +68,4 @@ export type PopupInit =
   | { mode: 'message'; options: PopupMessageOptions }
   | { mode: 'prompt'; options: PopupPromptOptions }
   | { mode: 'settings'; options: PopupSettingsOptions; data: SettingsData }
+  | { mode: 'chapter'; options: PopupChapterOptions }

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { layoutOf } from './lib/layout'
+import { ChapterPanel } from './components/ChapterPanel'
 import { MessageBand } from './components/MessageBand'
 import { PromptBand } from './components/PromptBand'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -27,5 +28,6 @@ export function App({ init }: { init: PopupInit }): React.JSX.Element {
 
   if (init.mode === 'message') return <MessageBand options={init.options} />
   if (init.mode === 'prompt') return <PromptBand options={init.options} />
+  if (init.mode === 'chapter') return <ChapterPanel options={init.options} />
   return <SettingsPanel data={init.data} />
 }

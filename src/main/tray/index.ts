@@ -3,7 +3,7 @@ import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
 import { error } from '../util'
 import { Reader } from '../reader'
-import type { Book, Chapter } from '../reader'
+import type { Book } from '../reader'
 import { Config as WebDavConfig } from '../webdav'
 import path from 'path'
 import log from 'electron-log/main'
@@ -58,8 +58,6 @@ export class TrayManager {
     log.info(`TrayManager ==> init`)
     await this.create0()
 
-    // 章节变化(菜单点击/快捷键/翻页跨章等)时重建菜单,
-    this.reader.on('chapter', () => this.refreshContextMenu().then(null))
     this.mainWindow.on('show', () => this.create())
     this.mainWindow.on('hide', () => this.destroy())
     log.info(`TrayManager ==> init ok`)
@@ -84,25 +82,10 @@ export class TrayManager {
   private async refreshContextMenu(): Promise<void> {
     if (!this.tray) return
     const book = await this.reader.book()
-    const chapter = await this.reader.chapter()
-    this.tray.setContextMenu(this.buildMenu(book, chapter))
+    this.tray.setContextMenu(this.buildMenu(book))
   }
 
-  private buildMenu(book: Book, chapter: Chapter): Menu {
-    const chapters = book.chapters
-    const chapterItems = chapters.map((it) => {
-      // 章节标题超 20 字符截断
-      const label = it.title.length > 20 ? `${it.title.substring(0, 20)}…` : it.title
-      return {
-        label: label,
-        type: 'checkbox' as const,
-        checked: it.index === chapter.index,
-        click: (): void => {
-          this.jumpChapter(it.index).then(null)
-        }
-      }
-    })
-
+  private buildMenu(book: Book): Menu {
     return Menu.buildFromTemplate([
       {
         label: '跳转行数',
@@ -111,13 +94,8 @@ export class TrayManager {
       },
       {
         label: '跳转章节',
-        enabled: chapterItems.length > 0,
-        submenu: chapterItems.length > 0 ? chapterItems : undefined
-      },
-      {
-        label: '跳转章节号',
-        enabled: chapterItems.length > 0,
-        click: () => this.showJumpChapterDialog()
+        enabled: book.chapters.length > 0,
+        click: () => this.showChapterPicker().then(null)
       },
       { type: 'separator' },
       { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
@@ -167,11 +145,6 @@ export class TrayManager {
     await this.popup.settings()
   }
 
-  async jumpChapter(index: number): Promise<void> {
-    await this.initlization
-    await this.reader.jumpChapter(index)
-  }
-
   async showJumpDialog(): Promise<void> {
     await this.initlization
 
@@ -196,7 +169,7 @@ export class TrayManager {
     await this.reader.jumpLine(pageNumber)
   }
 
-  async showJumpChapterDialog(): Promise<void> {
+  async showChapterPicker(): Promise<void> {
     await this.initlization
 
     const book = await this.reader.book()
@@ -206,27 +179,15 @@ export class TrayManager {
       return
     }
 
-    // 序号从 0 开始, 与跳转章节 tray 子菜单的 toc index 一致(含前言为 0)
+    // 序号从 0 开始(含前言为 0), 与本地章节表 toc index 一致
     const current = Math.max((await this.reader.chapter()).index, 0)
-    const maxChapterInedx = chapters.length - 1
-    const chapterInput = await this.popup.prompt({
-      title: `选择章节`,
-      label: `请输入章节序号 (0 - ${maxChapterInedx})`,
-      value: current.toString(),
-      inputAttrs: {
-        type: 'number',
-        min: 0,
-        max: maxChapterInedx
-      }
+    const index = await this.popup.chapters({
+      bookName: book.name,
+      chapters: chapters.map((it) => ({ index: it.index, title: it.title })),
+      current
     })
-
-    if (!chapterInput) return
-    const chapterIndex = parseInt(chapterInput)
-    if (isNaN(chapterIndex) || chapterIndex < 0 || chapterIndex >= chapters.length) {
-      error('章节序号无效')
-      return
-    }
-    await this.reader.jumpChapter(chapterIndex)
+    if (index === null) return
+    await this.reader.jumpChapter(index)
   }
 
   async showSelectFileDialog(): Promise<void> {
