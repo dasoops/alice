@@ -47,7 +47,7 @@ jobs:
       - name: release
         uses: softprops/action-gh-release@v3
         with:
-          draft: true
+          draft: false
           files: |
             dist/*.exe
             dist/*.zip
