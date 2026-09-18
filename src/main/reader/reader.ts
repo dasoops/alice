@@ -80,6 +80,8 @@ export class Reader extends EventEmitter<BookEvents> {
       return
     }
     this.mainWindow.webContents.send('refresh-content')
+    // 切换书籍后立即拉取远端进度, 窗口可见时允许弹恢复确认
+    this.fireSync({ pull: true, push: true })
   }
 
   private async init(): Promise<void> {
