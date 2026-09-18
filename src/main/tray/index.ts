@@ -60,6 +60,8 @@ export class TrayManager {
 
     this.mainWindow.on('show', () => this.create())
     this.mainWindow.on('hide', () => this.destroy())
+    // 切换书籍成功后重建菜单, 刷新最近阅读列表
+    this.reader.on('book', () => this.refreshContextMenu().catch(() => undefined))
     log.info(`TrayManager ==> init ok`)
   }
 
@@ -86,6 +88,7 @@ export class TrayManager {
   }
 
   private buildMenu(book: Book): Menu {
+    const recent = this.reader.recentFiles()
     return Menu.buildFromTemplate([
       {
         label: '跳转行数',
@@ -99,6 +102,14 @@ export class TrayManager {
       },
       { type: 'separator' },
       { label: '选择阅读文件', click: () => this.showSelectFileDialog() },
+      {
+        label: '最近阅读',
+        enabled: recent.length > 0,
+        submenu: recent.map((file) => ({
+          label: path.basename(file),
+          click: () => this.switchBook(file)
+        }))
+      },
       { label: '打开阅读文件', click: () => this.openReadFile() },
       { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
       { type: 'separator' },
@@ -128,6 +139,13 @@ export class TrayManager {
     log.info(`TrayManager ==> destroy`)
     this.tray?.destroy()
     this.tray = undefined
+  }
+
+  async switchBook(file: string): Promise<void> {
+    await this.initlization
+    // 点击当前书籍不重载, 避免重置阅读进度
+    if ((await this.reader.book()).path === file) return
+    await this.reader.setFile(file)
   }
 
   async openReadFile(): Promise<void> {

@@ -40,9 +40,13 @@ export function readSettings(confs: SettingsConfs): SettingsData {
 }
 
 // 校验与规范化统一在渲染层完成, 主进程仅做透传回填;
-// position 为运行状态, 不属于设置契约, 回填时从当前 store 保留
+// position/recent 为运行状态, 不属于设置契约, 回填时从当前 store 保留
 export function writeSettings(confs: SettingsConfs, patch: SettingsData): SettingsData {
-  confs.reader.store = { ...patch.reader, position: confs.reader.store.position }
+  confs.reader.store = {
+    ...patch.reader,
+    position: confs.reader.store.position,
+    recent: confs.reader.store.recent
+  }
   confs.webdav.store = patch.webdav
   confs.shortcut.store = patch.shortcut
   return patch

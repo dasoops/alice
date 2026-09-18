@@ -51,8 +51,8 @@ export type PopupChapterOptions = {
   current: number
 }
 
-// 与 ReaderConfig 同构(剔除运行状态 position)
-export type ReaderSettings = Omit<ReaderConfig, 'position'>
+// 与 ReaderConfig 同构(剔除运行状态 position 与 recent)
+export type ReaderSettings = Omit<ReaderConfig, 'position' | 'recent'>
 
 export type WebDavSettings = WebDavConfig
 

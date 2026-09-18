@@ -14,7 +14,16 @@ import EventEmitter from 'node:events'
 import { Config } from './config'
 import type { PopupManager } from '../popup'
 
-export class Reader extends EventEmitter<BookEvents> {
+// 最近阅读保留的最大条数
+const maxRecent = 10
+
+// ReaderEvents = 书籍事件 + 阅读器自身事件
+export type ReaderEvents = BookEvents & {
+  // 书籍切换成功, 供托盘重建最近阅读菜单
+  book: []
+}
+
+export class Reader extends EventEmitter<ReaderEvents> {
   private readonly conf: Conf<Config>
   private readonly mainWindow: BrowserWindow
   private readonly webdav: WebDavClient
@@ -69,8 +78,9 @@ export class Reader extends EventEmitter<BookEvents> {
     this.promptedRemote = undefined
     // 解析可能较慢(epub 解压), 先通知渲染进程展示 loading, 避免停留在旧书
     this.mainWindow.webContents.send('loading')
+    let loaded: string
     try {
-      await this.load(path)
+      loaded = await this.load(path)
     } catch (err) {
       // 解析失败(如 epub 无正文章节)回滚文件配置, 保持旧书, 阻止切换
       this.conf.set('file', previous)
@@ -79,9 +89,24 @@ export class Reader extends EventEmitter<BookEvents> {
       log.warn(`Reader ==> 打开书籍失败: ${err}`)
       return
     }
+    this.recordRecent(loaded)
+    this.emit('book')
     this.mainWindow.webContents.send('refresh-content')
     // 切换书籍后立即拉取远端进度, 窗口可见时允许弹恢复确认
     this.fireSync({ pull: true, push: true })
+  }
+
+  // 最近阅读列表, 按时间倒序, 过滤已删除文件
+  public recentFiles(): string[] {
+    return this.conf.get('recent').filter((file) => fs.existsSync(file))
+  }
+
+  private recordRecent(filePath: string): void {
+    // 默认占位文本不进入最近阅读; 重复打开只刷新到最前
+    if (filePath === Config.Default.file) return
+    const recent = this.conf.get('recent').filter((it) => it !== filePath)
+    recent.unshift(filePath)
+    this.conf.set('recent', recent.slice(0, maxRecent))
   }
 
   private async init(): Promise<void> {
@@ -95,7 +120,7 @@ export class Reader extends EventEmitter<BookEvents> {
     ipcMain.handle('reader:fileName', (): string => path.basename(this.conf.get('file')))
 
     try {
-      await this.load(this.conf.get('file'))
+      this.recordRecent(await this.load(this.conf.get('file')))
     } catch (err) {
       // 初始书籍解析失败(如 epub 无正文章节)回退默认文本, 避免应用无法启动
       log.warn(`Reader ==> 初始书籍加载失败, 回退默认文本: ${err}`)
@@ -111,7 +136,8 @@ export class Reader extends EventEmitter<BookEvents> {
     log.info(`Reader <== init ok.`)
   }
 
-  private async load(filePath: PathLike): Promise<void> {
+  // 返回实际加载的文件路径(文件不存在时会回退默认文本)
+  private async load(filePath: PathLike): Promise<string> {
     if (!fs.existsSync(filePath)) {
       filePath = Config.Default.file
       fs.writeFileSync(filePath, '阅读文件不存在, 请配置.')
@@ -123,6 +149,7 @@ export class Reader extends EventEmitter<BookEvents> {
       this.emit('chapter', chapter, previous)
     })
     this._book.setPosition(this.conf.get('position'))
+    return String(filePath)
   }
 
   async read(offset: number): Promise<string> {
