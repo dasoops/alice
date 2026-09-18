@@ -67,11 +67,14 @@ export class Reader extends EventEmitter<BookEvents> {
     this.conf.set('file', path)
     this.conf.reset('position')
     this.promptedRemote = undefined
+    // 解析可能较慢(epub 解压), 先通知渲染进程展示 loading, 避免停留在旧书
+    this.mainWindow.webContents.send('loading')
     try {
       await this.load(path)
     } catch (err) {
       // 解析失败(如 epub 无正文章节)回滚文件配置, 保持旧书, 阻止切换
       this.conf.set('file', previous)
+      this.mainWindow.webContents.send('loading-hide')
       error(`无法打开书籍: ${path}`)
       log.warn(`Reader ==> 打开书籍失败: ${err}`)
       return

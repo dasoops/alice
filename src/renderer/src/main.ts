@@ -28,7 +28,16 @@ async function init0(): Promise<void> {
       modal.style.display = 'none'
     }
   })
+  ipcRenderer.on('loading', async () => {
+    log.debug('ipcRenderer <== loading')
+    await showLoading()
+  })
+  ipcRenderer.on('loading-hide', () => {
+    log.debug('ipcRenderer <== loading-hide')
+    hideLoading()
+  })
   ipcRenderer.on('refresh-content', async () => {
+    log.debug('ipcRenderer <== refresh-content')
     await changePage(0)
   })
 
@@ -44,14 +53,19 @@ async function init0(): Promise<void> {
   await changePage(0)
 }
 
+async function showLoading(): Promise<void> {
+  document.getElementById('loading')!.classList.remove('hidden')
+  document.getElementById('loading-text')!.textContent = `正在加载 ${await api.reader.fileName()}`
+}
+
+function hideLoading(): void {
+  document.getElementById('loading')!.classList.add('hidden')
+}
+
 async function changePage(offset: number): Promise<void> {
   const contentDiv = document.getElementById('content')!
-  const loadingDiv = document.getElementById('loading')!
   // 首次读取需等待主进程解压 epub, 期间展示 loading 避免空白
-  if (contentDiv.innerHTML.length === 0) {
-    loadingDiv.classList.remove('hidden')
-    document.getElementById('loading-text')!.textContent = `正在加载 ${await api.reader.fileName()}`
-  }
+  if (contentDiv.innerHTML.length === 0) await showLoading()
   try {
     const content = await api.reader.read(offset)
     contentDiv.innerHTML = content
@@ -60,7 +74,7 @@ async function changePage(offset: number): Promise<void> {
       .filter((it) => it.length > 0)
       .join(br)
   } finally {
-    loadingDiv.classList.add('hidden')
+    hideLoading()
   }
 }
 
