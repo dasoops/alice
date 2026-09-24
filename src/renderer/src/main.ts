@@ -54,11 +54,13 @@ async function init0(): Promise<void> {
 }
 
 async function showLoading(): Promise<void> {
+  document.getElementById('content')!.classList.add('hidden')
   document.getElementById('loading')!.classList.remove('hidden')
   document.getElementById('loading-text')!.textContent = `正在加载 ${await api.reader.fileName()}`
 }
 
 function hideLoading(): void {
+  document.getElementById('content')!.classList.remove('hidden')
   document.getElementById('loading')!.classList.add('hidden')
 }
 
