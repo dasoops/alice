@@ -125,6 +125,24 @@ if (!instanceLock) {
   app.quit()
 }
 
+// 打包版同样允许 F12 切换开发者工具. optimizer 仅在开发模式处理 F12,
+// 且会主动拦截打包版的 Ctrl+Shift+I, 因此生产环境自行接管; 开发模式跳过以免双触发
+function registerDevToolsShortcut(window: BrowserWindow): void {
+  if (is.dev) return
+  const { webContents } = window
+  webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.code !== 'F12') return
+    // 长按 F12 的重复 keyDown 会来回开关
+    if (input.isAutoRepeat) return
+    event.preventDefault()
+    if (webContents.isDevToolsOpened()) {
+      webContents.closeDevTools()
+    } else {
+      webContents.openDevTools({ mode: 'undocked' })
+    }
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -138,6 +156,7 @@ app.whenReady().then(async () => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+    registerDevToolsShortcut(window)
   })
 
   const conf = registerConfig()
