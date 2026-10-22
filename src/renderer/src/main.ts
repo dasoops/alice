@@ -21,12 +21,7 @@ async function init0(): Promise<void> {
   })
   ipcRenderer.on('toggle-lock', async () => {
     log.debug('ipcRenderer <== toggle-lock')
-    const modal = document.getElementById('modal')!
-    if (modal.style.display !== 'flex') {
-      modal.style.display = 'flex'
-    } else {
-      modal.style.display = 'none'
-    }
+    document.getElementById('reader')!.classList.toggle('is-unlocked')
   })
   ipcRenderer.on('loading', async () => {
     log.debug('ipcRenderer <== loading')
@@ -41,14 +36,14 @@ async function init0(): Promise<void> {
     await changePage(0)
   })
 
-  const contentDiv = document.getElementById('content')!
-  contentDiv.addEventListener('wheel', async (event) => {
+  // 监听挂在 window: 文本外的空白区与 loading 上都可翻页
+  window.addEventListener('wheel', async (event) => {
     // 上滑
     if (event.deltaY < 0) await changePage(-1)
     // 下滑
     else if (event.deltaY > 0) await changePage(1)
   })
-  contentDiv.addEventListener('contextmenu', api.toggleDisplay)
+  window.addEventListener('contextmenu', api.toggleDisplay)
 
   await changePage(0)
 }
@@ -64,11 +59,20 @@ function hideLoading(): void {
   document.getElementById('loading')!.classList.add('hidden')
 }
 
-async function changePage(offset: number): Promise<void> {
+// read 会推进主进程侧阅读位置, 并发调用(滚轮高频 / 切书刷新)会让位置与显示错乱, 故串行化
+let queue: Promise<void> = Promise.resolve()
+
+function changePage(offset: number): Promise<void> {
+  const next = queue.catch(() => undefined).then(() => renderPage(offset))
+  queue = next
+  return next
+}
+
+async function renderPage(offset: number): Promise<void> {
   const contentDiv = document.getElementById('content')!
-  // 首次读取需等待主进程解压 epub, 期间展示 loading 避免空白
-  if (contentDiv.innerHTML.length === 0) await showLoading()
   try {
+    // 首次读取需等待主进程解压 epub, 期间展示 loading 避免空白
+    if (contentDiv.innerHTML.length === 0) await showLoading()
     const content = await api.reader.read(offset)
     contentDiv.innerHTML = content
       .split('\n')

@@ -6,7 +6,16 @@ body {
   user-select: none;
 }
 
+#reader {
+  /* 固定占满窗口: 文本较短时其下方空白区也能接收滚轮/右键 */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
 #content {
+  width: 100%;
+  height: 100%;
   padding: 0;
   font-family: '微软雅黑', serif;
   font-size: 16px;
@@ -15,13 +24,20 @@ body {
   overflow: hidden;
 }
 
+#content.hidden {
+  display: none;
+}
+
+/* 解锁态整窗可拖; 根节点负责遮罩, 无需额外的 modal 层 */
+#reader.is-unlocked {
+  background-color: rgba(0, 0, 0, 0.5);
+  -webkit-app-region: drag;
+}
+
 #loading {
   /* 覆盖窗口, epub 解压期间占位避免空白 */
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -49,20 +65,4 @@ body {
   to {
     transform: rotate(360deg);
   }
-}
-
-#modal {
-  /* 固定在视口中 */
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  display: none;
-  justify-content: center;
-  align-items: center;
-  /* 可拖动区域 */
-  -webkit-app-region: drag;
 }
