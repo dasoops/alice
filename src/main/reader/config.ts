@@ -8,6 +8,7 @@ export type TxtConfig = { chapterRegex: string[] }
 export type Config = {
   file: string
   position: Position
+  // 单页字符上限, 与 maxLine 先到为准; 防止超长段落撑爆窗口, 调小会掩盖 maxLine 的效果
   chunkSize: number
   maxLine: number
   txt: TxtConfig

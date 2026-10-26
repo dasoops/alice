@@ -59,7 +59,7 @@ export function errorList(errors: SettingsErrors): string[] {
     if (message) list.push(`${label}: ${message}`)
   }
   push(errors.file, '阅读: 阅读文件')
-  push(errors.chunkSize, '阅读: 每行字符数')
+  push(errors.chunkSize, '阅读: 单页字符上限')
   push(errors.maxLine, '阅读: 每次展示行数')
   push(errors.url, 'WebDav 同步: 地址')
   push(errors.directory, 'WebDav 同步: 目录')

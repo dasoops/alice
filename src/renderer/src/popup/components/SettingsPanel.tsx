@@ -140,7 +140,7 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
         </label>
 
         <label className={styles.row}>
-          <span className={styles['row-key']}>每行字符数</span>
+          <span className={styles['row-key']}>单页字符上限</span>
           <input
             className={`${shared.input} ${styles['input-number']}${
               errors.chunkSize ? ` ${shared['is-invalid']}` : ''
