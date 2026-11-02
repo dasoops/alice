@@ -128,7 +128,8 @@ export class PopupManager {
       transparent: true,
       backgroundColor: '#00000000',
       resizable: false,
-      movable: false,
+      // 设置/章节选择面板顶部栏可拖动窗口; 阅读条固定在主窗口位置, 不允许移动
+      movable: mode === 'settings' || mode === 'chapter',
       minimizable: false,
       maximizable: false,
       fullscreenable: false,

@@ -16,6 +16,13 @@
   padding: 10px 14px;
   background: #303234;
   border-bottom: 1px solid var(--border);
+  /* 顶部栏作为窗口拖动区 */
+  -webkit-app-region: drag;
+}
+
+/* 栏内按钮需可点击, 从拖动区中排除 */
+.panel-bar button {
+  -webkit-app-region: no-drag;
 }
 
 .panel-title {

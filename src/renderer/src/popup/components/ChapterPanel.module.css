@@ -16,6 +16,8 @@
   padding: 10px 12px;
   background: #303234;
   border-bottom: 1px solid var(--border);
+  /* 顶部栏作为窗口拖动区 */
+  -webkit-app-region: drag;
 }
 
 .title {
@@ -48,6 +50,8 @@
   font-size: 13px;
   color: var(--faint);
   cursor: pointer;
+  /* 关闭按钮需可点击, 从拖动区中排除 */
+  -webkit-app-region: no-drag;
 }
 
 .close:hover {
