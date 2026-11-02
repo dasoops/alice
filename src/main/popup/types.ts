@@ -51,6 +51,15 @@ export type PopupChapterOptions = {
   current: number
 }
 
+// 章节选择按卷分组: title/head 只有可识别的卷首章节组才有;
+// chapters 含卷首章节本身, collapsible 由主进程按组内章节数判定
+export type PopupChapterGroup = {
+  title?: string
+  head?: number
+  chapters: PopupChapter[]
+  collapsible: boolean
+}
+
 // 与 ReaderConfig 同构(剔除运行状态 position 与 recent)
 export type ReaderSettings = Omit<ReaderConfig, 'position' | 'recent'>
 
@@ -68,4 +77,4 @@ export type PopupInit =
   | { mode: 'message'; options: PopupMessageOptions }
   | { mode: 'prompt'; options: PopupPromptOptions }
   | { mode: 'settings'; options: PopupSettingsOptions; data: SettingsData }
-  | { mode: 'chapter'; options: PopupChapterOptions }
+  | { mode: 'chapter'; options: PopupChapterOptions; groups: PopupChapterGroup[] }

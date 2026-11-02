@@ -28,6 +28,6 @@ export function App({ init }: { init: PopupInit }): React.JSX.Element {
 
   if (init.mode === 'message') return <MessageBand options={init.options} />
   if (init.mode === 'prompt') return <PromptBand options={init.options} />
-  if (init.mode === 'chapter') return <ChapterPanel options={init.options} />
+  if (init.mode === 'chapter') return <ChapterPanel options={init.options} groups={init.groups} />
   return <SettingsPanel data={init.data} />
 }

@@ -4,6 +4,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { readSettings, writeSettings, type SettingsConfs } from './schema'
+import { buildChapterGroups } from './volumes'
 import { configDir } from '../util'
 import type {
   PopupChapterOptions,
@@ -58,7 +59,12 @@ export class PopupManager {
 
   // 章节选择面板; 返回选中章节 index, 失焦/取消返回 null
   public chapters(options: PopupChapterOptions): Promise<number | null> {
-    return this.open<number | null>({ mode: 'chapter', options }, null, true)
+    // 卷分组为纯函数结果, 与 options 一并下发渲染进程
+    return this.open<number | null>(
+      { mode: 'chapter', options, groups: buildChapterGroups(options.chapters) },
+      null,
+      true
+    )
   }
 
   public dispose(): void {

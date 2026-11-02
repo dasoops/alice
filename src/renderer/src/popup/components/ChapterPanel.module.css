@@ -117,6 +117,63 @@
   border-left: 2px solid transparent;
 }
 
+/* 卷头行: 次要背景 + 缩进层级, 点击折叠/展开本卷 */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+
+.volume:first-child {
+  border-top: none;
+}
+
+.volume:hover {
+  background: var(--surface);
+}
+
+.arrow {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  font-family: var(--font-mono), serif;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--faint);
+  transition: transform 120ms ease;
+}
+
+.arrowOpen {
+  transform: rotate(90deg);
+}
+
+.volTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.volume:hover .volTitle {
+  color: var(--fg);
+}
+
+.volCount {
+  flex: none;
+  font-family: var(--font-mono), serif;
+  font-size: 10px;
+  color: var(--faint);
+}
+
 .row:hover {
   background: var(--surface-2);
 }
@@ -197,6 +254,12 @@
 
 .hint {
   color: var(--faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow {
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
