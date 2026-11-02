@@ -207,6 +207,56 @@ export class Reader extends EventEmitter<ReaderEvents> {
     }
   }
 
+  // 托盘菜单手动拉取: 复用同步流程, 远端领先时由 sync 弹恢复确认
+  public async pullProgress(): Promise<void> {
+    await this.initlization
+    if (!this.webdav.enabled()) {
+      error('请先启用 WebDav 同步')
+      return
+    }
+    try {
+      // 手动拉取是明确意图, 清掉忽略快照, 保证远端领先时仍会弹恢复确认
+      this.promptedRemote = undefined
+      log.info('WebDavSync ==> 手动拉取云端进度')
+      await this.sync({ pull: true, push: false })
+    } catch (err) {
+      error('拉取云端进度失败')
+      log.warn(`WebDavSync ==> 拉取云端进度失败: ${err}`)
+    }
+  }
+
+  // 托盘菜单手动覆盖: 展示云端/本地进度后二次确认, 确认后静默上传
+  public async overwriteProgress(): Promise<void> {
+    await this.initlization
+    if (!this.webdav.enabled()) {
+      error('请先启用 WebDav 同步')
+      return
+    }
+    try {
+      const book = await this.book()
+      const local = this.localProgress(book)
+      const remote = await this.progressSync.fetch(book)
+      const response = await this.popup.message({
+        type: 'warning',
+        title: 'WebDav 同步',
+        message: '以本地进度覆盖云端进度?',
+        detail: `云端进度: ${remote ? remote.durChapterTitle : '无'}\n本地进度: ${local.durChapterTitle}`,
+        buttons: ['覆盖', '取消'],
+        // 覆盖不可撤销, 默认按钮与 Esc 均回到取消
+        defaultId: 1,
+        cancelId: 1
+      })
+      if (response !== 0) return
+      await this.progressSync.push(book, local)
+      // 云端已被本地覆盖, 避免随后自动同步就同一进度重复提示
+      this.promptedRemote = local
+      log.info('WebDavSync ==> 手动覆盖云端进度')
+    } catch (err) {
+      error('覆盖云端进度失败')
+      log.warn(`WebDavSync ==> 覆盖云端进度失败: ${err}`)
+    }
+  }
+
   private async sync(trigger: SyncTrigger): Promise<void> {
     const book = await this.book()
 

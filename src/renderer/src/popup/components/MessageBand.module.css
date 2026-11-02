@@ -31,6 +31,8 @@
 .band-detail {
   font-size: 11px;
   color: var(--muted);
+  /* 保留 detail 中的换行(如覆盖进度确认的云端/本地两行) */
+  white-space: pre-line;
 }
 
 .lead {

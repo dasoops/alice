@@ -5,7 +5,7 @@ import {
   type BookProgress,
   type SyncMode
 } from './progress'
-import { WebDavClient } from '../../webdav'
+import type { WebDavClient } from '../../webdav'
 import log from 'electron-log/main'
 
 // legado 使用的进度目录
@@ -33,8 +33,29 @@ export class ProgressSync {
     local: () => BookProgress,
     trigger: SyncTrigger = { pull: true, push: true }
   ): Promise<BookProgress | undefined> {
-    const run = (this.pending ?? Promise.resolve()).then(() => this.sync0(book, local, trigger))
-    // 队列尾吞掉错误, 保证本次失败不阻塞后续任务
+    return this.enqueue(() => this.sync0(book, local, trigger))
+  }
+
+  // 以本地进度覆盖远端
+  public push(book: BookMeta, local: BookProgress): Promise<void> {
+    return this.enqueue(async () => {
+      if (!this.webdav.enabled()) return
+      await this.webdav.ensureDirs(legadoDir)
+      await this.webdav.put(this.progressPath(book), JSON.stringify(local))
+    })
+  }
+
+  // 读取远端进度; 供手动覆盖前展示云端状态, 同步流程复用. 404 视为无远端进度
+  public async fetch(book: BookMeta): Promise<BookProgress | undefined> {
+    const { status, text } = await this.webdav.get(this.progressPath(book))
+    if (status === 404) return undefined
+    if (status !== 200) throw Error(`get progress failed: ${status}`)
+    return JSON.parse(text) as BookProgress
+  }
+
+  // 串行执行任务: 前一次(含失败)结束后才执行本次; 队列尾吞错, 本次调用仍返回真实结果
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = (this.pending ?? Promise.resolve()).then(task)
     this.pending = run.then(
       () => undefined,
       () => undefined
@@ -67,14 +88,6 @@ export class ProgressSync {
       await this.webdav.put(this.progressPath(book), JSON.stringify(current))
     }
     return undefined
-  }
-
-  private async fetch(book: BookMeta): Promise<BookProgress | undefined> {
-    const { status, text } = await this.webdav.get(this.progressPath(book))
-    // 404 视为无远端进度
-    if (status === 404) return undefined
-    if (status !== 200) throw Error(`get progress failed: ${status}`)
-    return JSON.parse(text) as BookProgress
   }
 
   private progressPath(book: BookMeta): string {

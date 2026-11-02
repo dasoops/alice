@@ -62,6 +62,10 @@ export class TrayManager {
     this.mainWindow.on('hide', () => this.destroy())
     // 切换书籍成功后重建菜单, 刷新最近阅读列表
     this.reader.on('book', () => this.refreshContextMenu().catch(() => undefined))
+    // 设置面板等外部途径修改启用状态后, 刷新子菜单勾选与可用态
+    this.conf.webdav.onDidChange('enabled', () => {
+      this.refreshContextMenu().catch(() => undefined)
+    })
     log.info(`TrayManager ==> init ok`)
   }
 
@@ -89,6 +93,7 @@ export class TrayManager {
 
   private buildMenu(book: Book): Menu {
     const recent = this.reader.recentFiles()
+    const webdavEnabled = this.conf.webdav.get('enabled')
     return Menu.buildFromTemplate([
       {
         label: '跳转行数',
@@ -121,10 +126,26 @@ export class TrayManager {
         checked: this.conf.window.get('penetrate')
       },
       {
-        type: 'checkbox',
-        label: 'WebDav 同步',
-        click: ({ checked }) => this.toggleSync(checked).then(null),
-        checked: this.conf.webdav.get('enabled')
+        label: 'WebDav',
+        submenu: [
+          {
+            type: 'checkbox',
+            label: '启用',
+            click: ({ checked }) => this.toggleSync(checked).then(null),
+            checked: webdavEnabled
+          },
+          { type: 'separator' },
+          {
+            label: '拉取云端进度',
+            enabled: webdavEnabled,
+            click: () => this.pullProgress().then(null)
+          },
+          {
+            label: '覆盖云端进度',
+            enabled: webdavEnabled,
+            click: () => this.overwriteProgress().then(null)
+          }
+        ]
       },
       { label: '退出', click: () => this.handler.exit() }
     ])
@@ -229,6 +250,17 @@ export class TrayManager {
     await this.reader.setFile(filePaths[0])
   }
 
+  async pullProgress(): Promise<void> {
+    await this.initlization
+    await this.reader.pullProgress()
+  }
+
+  // 覆盖确认(含云端/本地进度)与静默上传由 Reader 统一处理, 托盘只负责触发
+  async overwriteProgress(): Promise<void> {
+    await this.initlization
+    await this.reader.overwriteProgress()
+  }
+
   async togglePenetrate(value: boolean): Promise<void> {
     await this.initlization
     this.conf.window.set('penetrate', value)
@@ -244,5 +276,7 @@ export class TrayManager {
       return
     }
     this.conf.webdav.set('enabled', value)
+    // 重建菜单, 刷新子菜单勾选与拉取/覆盖项可用态
+    await this.refreshContextMenu()
   }
 }
