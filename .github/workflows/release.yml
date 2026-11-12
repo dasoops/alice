@@ -5,8 +5,85 @@ on:
     tags:
       - v*.*.*
 
+# 回写 version 与 softprops/action-gh-release 都需要写权限
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  # 发布不可中断, 避免 tag 被移动到一半
+  cancel-in-progress: false
+
 jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v7
+        with:
+          # shallow clone 无法推送到默认分支, 回写需要完整历史
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Sync version with tag
+        env:
+          # 去掉 tag 的 v 前缀, 如 v2.1.5 -> 2.1.5
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${VERSION#v}"
+          npm pkg set version="$VERSION"
+          # npm pkg set 不会同步 lock, 用 node 改避免 npm install 联网
+          node -e '
+            const fs = require("fs")
+            const version = process.env.VERSION
+            const raw = fs.readFileSync("package-lock.json", "utf8")
+            // 保留原换行符, 否则 CRLF 工作区会整文件变更
+            const eol = raw.includes("\r\n") ? "\r\n" : "\n"
+            const lock = JSON.parse(raw)
+            lock.version = version
+            if (lock.packages?.[""]) lock.packages[""].version = version
+            fs.writeFileSync("package-lock.json", JSON.stringify(lock, null, 2).replace(/\n/g, eol) + eol)
+          '
+
+      - name: Commit version and move tag
+        id: commit
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          git add -A package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "package.json 版本已与 ${TAG} 一致, 跳过回写"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: 发布 ${TAG}"
+
+            # 先推默认分支: tag 不在其顶端时这里会被拒绝, 此时尚未改 tag, 不留半成品.
+            # 也避免发布的产物混入未 release 的改动
+            git push origin "HEAD:refs/heads/${DEFAULT_BRANCH}"
+
+            # tag 也移到新提交上, 否则从 tag 检出的源码版本号仍是旧值.
+            # GITHUB_TOKEN 的 push 不会触发新的 workflow, 不会造成循环
+            git tag -f "${TAG}"
+            git push --force origin "refs/tags/${TAG}"
+          fi
+
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: sync-version
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -16,6 +93,9 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v7
+        with:
+          # 构建回写后的提交, 产物内的版本号才与 tag 一致
+          ref: ${{ needs.sync-version.outputs.sha }}
 
       - name: Install Node.js
         uses: actions/setup-node@v7
