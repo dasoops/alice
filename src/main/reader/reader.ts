@@ -135,6 +135,12 @@ export class Reader extends EventEmitter<ReaderEvents> {
     this.conf.onDidChange('status', (status) => {
       this.mainWindow.webContents.send('status-config', status)
     })
+    // 分页参数变化后让主窗口重读当前页; read 会同时返回新分页下的进度
+    this.conf.onDidAnyChange((next, previous) => {
+      if (!next || !previous) return
+      if (next.maxLine === previous.maxLine && next.chunkSize === previous.chunkSize) return
+      this.mainWindow.webContents.send('paging-config')
+    })
 
     try {
       this.recordRecent(await this.load(this.conf.get('file')))

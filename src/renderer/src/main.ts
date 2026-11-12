@@ -109,6 +109,10 @@ async function init0(): Promise<void> {
     log.debug('ipcRenderer <== status-config')
     applyStatusConfig(config)
   })
+  ipcRenderer.on('paging-config', () => {
+    log.debug('ipcRenderer <== paging-config')
+    void changePage(0)
+  })
 
   // 监听挂在 window: 文本外的空白区与 loading 上都可翻页
   window.addEventListener('wheel', async (event) => {
