@@ -10,7 +10,18 @@ body {
   /* 固定占满窗口: 文本较短时其下方空白区也能接收滚轮/右键 */
   position: fixed;
   inset: 0;
+  box-sizing: border-box;
   overflow: hidden;
+}
+
+/* 上下角标预留正文空间, 角标本身不遮挡文字;
+   预留会缩小正文可用高度, 窗口高度不足时可能裁掉最后一行, 这是避免遮挡的取舍 */
+#reader.status-top {
+  padding-top: 28px;
+}
+
+#reader.status-bottom {
+  padding-bottom: 28px;
 }
 
 #content {
@@ -26,6 +37,59 @@ body {
 
 #content.hidden {
   display: none;
+}
+
+/* 阅读进度叠加在正文之上, 不参与鼠标交互 */
+#status {
+  position: absolute;
+  max-width: calc(100% - 16px);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  font-family: '微软雅黑', serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e6e6e6;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#status.hidden {
+  display: none;
+}
+
+/* 同正文样式: 字号小 2px, 去掉角标背景 */
+#status.is-plain {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #747474;
+}
+
+#status[data-corner='top-left'] {
+  top: 4px;
+  left: 4px;
+}
+
+#status[data-corner='top-right'] {
+  top: 4px;
+  right: 4px;
+}
+
+#status[data-corner='bottom-left'] {
+  bottom: 4px;
+  left: 4px;
+}
+
+#status[data-corner='bottom-right'] {
+  bottom: 4px;
+  right: 4px;
 }
 
 /* 解锁态整窗可拖; 根节点负责遮罩, 无需额外的 modal 层 */

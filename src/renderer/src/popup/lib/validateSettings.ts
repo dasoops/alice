@@ -13,6 +13,24 @@ export const syncOptions: { value: ReaderSettings['sync']['mode']; label: string
   { value: 'chapter', label: '仅同步章节' }
 ]
 
+export const statusCornerOptions: {
+  value: ReaderSettings['status']['corner']
+  label: string
+}[] = [
+  { value: 'top-left', label: '左上' },
+  { value: 'top-right', label: '右上' },
+  { value: 'bottom-left', label: '左下' },
+  { value: 'bottom-right', label: '右下' }
+]
+
+export const statusStyleOptions: {
+  value: ReaderSettings['status']['style']
+  label: string
+}[] = [
+  { value: 'plain', label: '正文' },
+  { value: 'badge', label: 'badge' }
+]
+
 // 编辑态实时校验: 非法值标红并在状态栏提示修改, 保存前拦截;
 // 校验保证值合法后, 提交前仅做 trim 清洗, 不再静默回退
 export type SettingsErrors = {
@@ -20,6 +38,7 @@ export type SettingsErrors = {
   chunkSize?: string
   maxLine?: string
   regex: (string | undefined)[]
+  statusFormats?: string
   url?: string
   directory?: string
 }
@@ -28,6 +47,7 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
   const positiveInt = (value: number): string | undefined =>
     value >= 1 && Number.isInteger(value) ? undefined : '需为大于 0 的整数'
   const required = (value: string): string | undefined => (value.trim() ? undefined : '不能为空')
+  const activeFormats = draft.reader.status.formats.filter((item) => item.enabled)
   const errors: SettingsErrors = {
     file: required(draft.reader.file.trim()),
     chunkSize: positiveInt(draft.reader.chunkSize),
@@ -42,6 +62,15 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
       }
       return undefined
     }),
+    statusFormats: !draft.reader.status.enabled
+      ? undefined
+      : activeFormats.length === 0
+        ? '请选择一个启用格式'
+        : activeFormats.length > 1
+          ? '只能启用一个格式'
+          : !activeFormats[0].template.trim()
+            ? '启用格式不能为空'
+            : undefined,
     // WebDav 未启用时地址/目录可留空, 启用后必须配置
     url: draft.webdav.enabled ? required(draft.webdav.url) : undefined,
     directory: draft.webdav.enabled ? required(draft.webdav.directory) : undefined
@@ -61,6 +90,7 @@ export function errorList(errors: SettingsErrors): string[] {
   push(errors.file, '阅读: 阅读文件')
   push(errors.chunkSize, '阅读: 单页字符上限')
   push(errors.maxLine, '阅读: 每次展示行数')
+  push(errors.statusFormats, '阅读进度: 格式')
   push(errors.url, 'WebDav 同步: 地址')
   push(errors.directory, 'WebDav 同步: 目录')
   errors.regex.forEach((message, index) => {
@@ -75,6 +105,7 @@ export function firstErrorKey(errors: SettingsErrors): string {
   if (errors.maxLine) return 'maxLine'
   const regexIndex = errors.regex.findIndex((message) => message !== undefined)
   if (regexIndex >= 0) return `regex:${regexIndex}`
+  if (errors.statusFormats) return 'statusFormats'
   if (errors.url) return 'url'
   return 'directory'
 }

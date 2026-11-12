@@ -54,3 +54,41 @@ export function pageRange(
   }
   return { begin, end }
 }
+
+// 从 from 起按页切分到 end(不含), 返回各页起始偏移; 末页在 end 处截断
+export function pageStarts(
+  content: string,
+  from: number,
+  end: number,
+  options: { maxLine: number; chunkSize: number }
+): number[] {
+  const starts: number[] = []
+  let start = from
+  while (start < end) {
+    starts.push(start)
+    const next = Math.min(nextPage(content, start, 0, options), end)
+    // 分页参数非法(如 maxLine/chunkSize 为 0)时避免死循环
+    if (next <= start) break
+    start = next
+  }
+  // 空区间也占一页, 避免页码出现 0/0
+  return starts.length > 0 ? starts : [from]
+}
+
+// 定位 index 所在页, 页码从 1 开始; index 落在末页之后时归入末页
+export function pageInfo(starts: number[], index: number): { current: number; total: number } {
+  const total = starts.length
+  let page = 0
+  let low = 0
+  let high = total - 1
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    if (starts[mid] <= index) {
+      page = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return { current: page + 1, total }
+}

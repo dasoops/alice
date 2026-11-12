@@ -5,13 +5,13 @@ import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
-import type { Book, BookEvents, Chapter } from './book'
+import type { Book, BookEvents, Chapter, PageOptions, ReadingProgress } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
 import { ProgressSync, type SyncTrigger } from './sync/sync'
 import { compareProgress, type BookProgress, type SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
-import { Config } from './config'
+import { Config, type StatusConfig } from './config'
 import type { PopupManager } from '../popup'
 
 // 最近阅读保留的最大条数
@@ -21,6 +21,18 @@ const maxRecent = 10
 export type ReaderEvents = BookEvents & {
   // 书籍切换成功, 供托盘重建最近阅读菜单
   book: []
+}
+
+// 阅读角标数据; 开关关闭时不计算进度, 仅回传配置
+export type ReaderStatus = {
+  config: StatusConfig
+  progress?: ReadingProgress
+}
+
+// 翻页结果携带同一页算出的进度, 避免渲染层再请求一次 reader:status
+export type ReadResult = {
+  content: string
+  status: ReaderStatus
 }
 
 export class Reader extends EventEmitter<ReaderEvents> {
@@ -113,11 +125,16 @@ export class Reader extends EventEmitter<ReaderEvents> {
     log.info(`Reader ==> init, conf: ${JSON.stringify(this.conf.store)}`)
 
     // 先注册 handler, 避免书籍解析(大 epub 可能较慢)期间渲染进程调用 read 报未注册
-    ipcMain.handle('reader:read', async (_, offset: number): Promise<string> => {
+    ipcMain.handle('reader:read', (_, offset: number): Promise<ReadResult> => {
       log.debug('on reader:read')
-      return await this.read(offset)
+      return this.read(offset)
     })
     ipcMain.handle('reader:fileName', (): string => path.basename(this.conf.get('file')))
+    ipcMain.handle('reader:status', (): Promise<ReaderStatus> => this.status())
+    // 设置面板修改角标配置后, 推送主窗口即时更新位置/显隐
+    this.conf.onDidChange('status', (status) => {
+      this.mainWindow.webContents.send('status-config', status)
+    })
 
     try {
       this.recordRecent(await this.load(this.conf.get('file')))
@@ -148,20 +165,45 @@ export class Reader extends EventEmitter<ReaderEvents> {
     this._book.on('chapter', (chapter: Chapter, previous: Chapter | undefined) => {
       this.emit('chapter', chapter, previous)
     })
-    this._book.setPosition(this.conf.get('position'))
+    const { maxLine, chunkSize } = this.conf.store
+    this._book.setPosition(this.conf.get('position'), { maxLine, chunkSize })
     return String(filePath)
   }
 
-  async read(offset: number): Promise<string> {
+  async read(offset: number): Promise<ReadResult> {
     const book = await this.book()
     const { maxLine, chunkSize } = this.conf.store
+    const options = { maxLine, chunkSize }
     log.debug(`Reader ==> position: ${JSON.stringify(book.position())}`)
 
-    const string = book.readPage(offset, { maxLine, chunkSize })
-    log.debug(`Reader ==> ${string}`)
+    const page = book.readPage(offset, options)
+    log.debug(`Reader ==> ${page.content}`)
     this.conf.set('position', book.position())
 
-    return string
+    return { content: page.content, status: this.statusOf(book, options, page.end) }
+  }
+
+  // 阅读角标数据; 关闭时不计算分页, 避免大文件首次展示时的全章扫描
+  async status(): Promise<ReaderStatus> {
+    const config = this.conf.get('status')
+    if (!config.enabled) return { config }
+
+    const book = await this.book()
+    const { maxLine, chunkSize } = this.conf.store
+    return this.statusOf(book, { maxLine, chunkSize })
+  }
+
+  // pageEnd 由 readPage 算出时传入, 复用同一次分页结果计算百分比;
+  // 进度计算失败不应阻断正文翻页, 因此在此隔离异常
+  private statusOf(book: Book, options: PageOptions, pageEnd?: number): ReaderStatus {
+    const config = this.conf.get('status')
+    if (!config.enabled) return { config }
+    try {
+      return { config, progress: book.readingProgress(options, pageEnd) }
+    } catch (err) {
+      log.warn(`Reader ==> 计算阅读进度失败: ${err}`)
+      return { config }
+    }
   }
 
   async lines(): Promise<{ current: number; total: number }> {
@@ -186,7 +228,8 @@ export class Reader extends EventEmitter<ReaderEvents> {
 
   async jumpChapter(index: number, position: number = 0): Promise<void> {
     const book = await this.book()
-    book.setPosition({ chapterIndex: index, chapterPos: position })
+    const { maxLine, chunkSize } = this.conf.store
+    book.setPosition({ chapterIndex: index, chapterPos: position }, { maxLine, chunkSize })
     this.conf.set('position', book.position())
     this.mainWindow.webContents.send('refresh-content')
   }

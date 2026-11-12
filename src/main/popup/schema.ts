@@ -14,13 +14,18 @@ export function readSettings(confs: SettingsConfs): SettingsData {
   const reader = confs.reader.store
   const webdav = confs.webdav.store
   const shortcut = confs.shortcut.store
+  // 数组单独解构处理, 避免引用传递
   return {
     reader: {
       file: reader.file,
       chunkSize: reader.chunkSize,
       maxLine: reader.maxLine,
       txt: { chapterRegex: [...reader.txt.chapterRegex] },
-      sync: { mode: reader.sync.mode }
+      sync: { mode: reader.sync.mode },
+      status: {
+        ...reader.status,
+        formats: reader.status.formats.map((item) => ({ ...item }))
+      }
     },
     webdav: {
       enabled: webdav.enabled,

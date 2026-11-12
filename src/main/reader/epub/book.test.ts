@@ -42,9 +42,9 @@ describe('Book', () => {
 
   it('readPage 返回当前页文本并推进定位', () => {
     const book = makeBook()
-    expect(book.readPage(0, paging)).toBe('第一章内容A')
+    expect(book.readPage(0, paging).content).toBe('第一章内容A')
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 0 })
-    expect(book.readPage(1, paging)).toBe('\n第一章内容B')
+    expect(book.readPage(1, paging).content).toBe('\n第一章内容B')
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 6 })
   })
 
@@ -53,7 +53,7 @@ describe('Book', () => {
     const changes: [Chapter, Chapter | undefined][] = []
     book.on('chapter', (current, previous) => changes.push([current, previous]))
     book.setPosition({ chapterIndex: 0, chapterPos: text1.length })
-    expect(book.readPage(1, paging)).toBe('第二章内容C')
+    expect(book.readPage(1, paging).content).toBe('第二章内容C')
     expect(book.position()).toEqual({ chapterIndex: 1, chapterPos: 0 })
     // 构造即定位于首章, 初始 setPosition 同章不触发事件
     expect(changes).toEqual([
@@ -67,20 +67,20 @@ describe('Book', () => {
   it('上一页触章头时切换到上章末页', () => {
     const book = makeBook()
     book.setPosition({ chapterIndex: 1, chapterPos: 0 })
-    expect(book.readPage(-1, paging)).toBe('\n第一章内容B')
+    expect(book.readPage(-1, paging).content).toBe('\n第一章内容B')
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 6 })
   })
 
   it('首章头向前翻页停留首页', () => {
     const book = makeBook()
-    expect(book.readPage(-1, paging)).toBe('第一章内容A')
+    expect(book.readPage(-1, paging).content).toBe('第一章内容A')
     expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 0 })
   })
 
   it('末章尾向后翻页停留末页', () => {
     const book = makeBook()
     book.setPosition({ chapterIndex: 1, chapterPos: text2.length })
-    expect(book.readPage(1, paging)).toBe('\n第二章内容D')
+    expect(book.readPage(1, paging).content).toBe('\n第二章内容D')
     expect(book.position()).toEqual({ chapterIndex: 1, chapterPos: 6 })
   })
 
@@ -96,7 +96,7 @@ describe('Book', () => {
       ]
     })
     book.setPosition({ chapterIndex: 0, chapterPos: 6 })
-    expect(book.readPage(1, paging)).toBe('乙')
+    expect(book.readPage(1, paging).content).toBe('乙')
     expect(book.position()).toEqual({ chapterIndex: 1, chapterPos: 0 })
   })
 
@@ -112,7 +112,97 @@ describe('Book', () => {
       ]
     })
     book.setPosition({ chapterIndex: 1, chapterPos: 1 })
-    expect(book.readPage(-1, paging)).toBe('X'.repeat(40))
-    expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 6 })
+    expect(book.readPage(-1, paging).content).toBe('X')
+    expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 45 })
+    expect(book.readingProgress(paging)).toMatchObject({ page: 5, pageTotal: 5 })
+  })
+
+  it('readingProgress 返回本章页码与全书字符进度', () => {
+    const book = makeBook()
+    const chunked = { maxLine: 99, chunkSize: 4 }
+    // 两章文本各 13 字符, 全书共 26 字符
+    book.setPosition({ chapterIndex: 0, chapterPos: 0 })
+    expect(book.readingProgress(chunked)).toEqual({
+      chapterTitle: '第1章',
+      page: 1,
+      pageTotal: 4,
+      percent: 4 / 26
+    })
+    book.setPosition({ chapterIndex: 0, chapterPos: 12 })
+    expect(book.readingProgress(chunked)).toEqual({
+      chapterTitle: '第1章',
+      page: 4,
+      pageTotal: 4,
+      percent: 13 / 26
+    })
+    book.setPosition({ chapterIndex: 1, chapterPos: 0 })
+    expect(book.readingProgress(chunked)).toEqual({
+      chapterTitle: '第2章',
+      page: 1,
+      pageTotal: 4,
+      percent: 17 / 26
+    })
+  })
+
+  it('readingProgress 复用 readPage 返回的页尾', () => {
+    const book = makeBook()
+    const chunked = { maxLine: 99, chunkSize: 4 }
+    const page = book.readPage(0, chunked)
+    expect(page.end).toBe(4)
+    expect(book.readingProgress(chunked, page.end)).toEqual({
+      chapterTitle: '第1章',
+      page: 1,
+      pageTotal: 4,
+      percent: 4 / 26
+    })
+  })
+
+  it('带分页参数的 setPosition 会把恢复位置吸附到页起点', () => {
+    const book = makeBook()
+    const chunked = { maxLine: 99, chunkSize: 4 }
+    book.setPosition({ chapterIndex: 0, chapterPos: 7 }, chunked)
+    expect(book.position()).toEqual({ chapterIndex: 0, chapterPos: 4 })
+    const page = book.readPage(0, chunked)
+    expect(page.content).toBe('容A\n第')
+    expect(book.readingProgress(chunked, page.end)).toMatchObject({
+      chapterTitle: '第1章',
+      page: 2,
+      pageTotal: 4
+    })
+  })
+
+  it('从下一章前翻回上一章末页', () => {
+    const book = new Book({
+      filePath: 'a.epub',
+      name: 'n',
+      author: '',
+      chapters: [
+        { index: 0, title: 'c0', id: 'c0', text: ['1', '2', '3', '4', '5'].join('\n') },
+        { index: 1, title: 'c1', id: 'c1', text: ['a', 'b'].join('\n') }
+      ]
+    })
+    const options = { maxLine: 2, chunkSize: 100 }
+    book.setPosition({ chapterIndex: 1, chapterPos: 0 }, options)
+    const page = book.readPage(-1, options)
+    expect(page.content).toBe('\n5')
+    expect(book.readingProgress(options, page.end)).toMatchObject({
+      chapterTitle: 'c0',
+      page: 3,
+      pageTotal: 3
+    })
+  })
+
+  it('末页继续向后翻时页码归到末页', () => {
+    const book = makeBook()
+    const chunked = { maxLine: 99, chunkSize: 4 }
+    book.setPosition({ chapterIndex: 1, chapterPos: 12 })
+    const page = book.readPage(1, chunked)
+    expect(page.end).toBe(13)
+    expect(book.readingProgress(chunked, page.end)).toMatchObject({
+      chapterTitle: '第2章',
+      page: 4,
+      pageTotal: 4,
+      percent: 1
+    })
   })
 })

@@ -93,6 +93,35 @@
   color: var(--number);
 }
 
+/* 格式列表: 每行单选 + 可编辑模板 */
+.format-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.format-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+  text-decoration: none;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .radio-group {
   display: flex;
   gap: 18px;

@@ -1,14 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf/renderer'
-import { Config } from '../main/reader'
+import { Config, type ReadResult, type ReaderStatus } from '../main/reader'
 
 // Custom APIs for renderer
 const api = {
   toggleDisplay: (): void => ipcRenderer.send('toggle-display'),
   reader: {
-    read: (offset: number): Promise<string> => ipcRenderer.invoke('reader:read', offset),
-    fileName: (): Promise<string> => ipcRenderer.invoke('reader:fileName')
+    read: (offset: number): Promise<ReadResult> => ipcRenderer.invoke('reader:read', offset),
+    fileName: (): Promise<string> => ipcRenderer.invoke('reader:fileName'),
+    status: (): Promise<ReaderStatus> => ipcRenderer.invoke('reader:status')
   },
   conf: new Conf<Config>({ name: 'reader' })
 }
