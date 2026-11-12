@@ -3,6 +3,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -201,6 +202,8 @@
 
 .status-path {
   max-width: 360px;
+  min-width: 0;
+  flex: 0 1 auto;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -217,15 +220,45 @@
 
 .status-save.has-error {
   max-width: 420px;
+  min-width: 0;
+  /* 允许收缩, 保证右侧按钮不被长错误信息挤出可视区 */
+  flex: 0 1 auto;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--danger-text);
 }
 
-.status-hint {
-  color: var(--faint);
-  flex: none;
+/* 覆盖整个面板, 含顶部拖动栏, 避免询问期间误拖窗口 */
+.confirm-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirm {
+  min-width: 280px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.confirm-text {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 @media (prefers-reduced-motion: no-preference) {

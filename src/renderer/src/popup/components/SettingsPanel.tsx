@@ -15,6 +15,7 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
   const [draft, setDraft0] = useState<SettingsData>(data)
   const originalRef = useRef(data)
   const [configDir, setConfigDir] = useState('')
+  const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
     void window.popup.configDir().then(setConfigDir)
@@ -73,23 +74,52 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
   const applyRef = useRef(apply)
   applyRef.current = apply
 
-  // 有未保存修改时先保存, 保存被校验拦截则保持面板打开
-  const closePopup = async (): Promise<void> => {
-    if (dirty && !(await apply())) return
+  // 有未保存修改时先询问, 避免关闭时静默写入; 询问框打开时 Esc 仅取消询问
+  const requestClose = (): void => {
+    if (confirming) {
+      setConfirming(false)
+      return
+    }
+    if (!dirty) {
+      window.popup.cancel()
+      return
+    }
+    setConfirming(true)
+  }
+
+  const requestCloseRef = useRef(requestClose)
+  requestCloseRef.current = requestClose
+  const confirmingRef = useRef(confirming)
+  confirmingRef.current = confirming
+
+  // 放弃修改直接关闭, 面板销毁后重新打开会回到已保存配置
+  const discardAndClose = (): void => {
+    setConfirming(false)
     window.popup.cancel()
   }
 
-  const closePopupRef = useRef(closePopup)
-  closePopupRef.current = closePopup
+  // 校验不通过时关闭询问框, 避免遮挡 apply 聚焦的错误字段
+  const saveAndClose = async (): Promise<void> => {
+    if (await apply()) {
+      window.popup.cancel()
+      return
+    }
+    setConfirming(false)
+  }
+
+  const saveAndCloseRef = useRef(saveAndClose)
+  saveAndCloseRef.current = saveAndClose
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        void closePopupRef.current()
+        requestCloseRef.current()
       } else if (event.key === 's' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault()
-        void applyRef.current()
+        // 询问框打开时 Ctrl+S 等同于确认保存
+        if (confirmingRef.current) void saveAndCloseRef.current()
+        else void applyRef.current()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -102,13 +132,7 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
     <div className={styles.panel} role="dialog" aria-modal="true" aria-label="设置">
       <header className={styles['panel-bar']}>
         <span className={styles['panel-title']}>设置</span>
-        <button
-          className={shared['icon-btn']}
-          aria-label="关闭"
-          onClick={() => {
-            void closePopup()
-          }}
-        >
+        <button className={shared['icon-btn']} aria-label="关闭" onClick={requestClose}>
           ✕
         </button>
       </header>
@@ -320,9 +344,60 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
               : `${errorTexts[0]} 等 ${errorTexts.length} 处`}
         </span>
         <span className={shared.spacer} />
-        <span className={styles['status-hint']}>Esc 关闭</span>
-        <span className={styles['status-hint']}>Ctrl+S 保存</span>
+        <button
+          className={`${shared.btn} ${shared['btn-ghost']}`}
+          title="Esc"
+          onClick={requestClose}
+        >
+          关闭
+        </button>
+        <button
+          className={`${shared.btn} ${shared['btn-primary']}`}
+          title="Ctrl+S"
+          // 无改动或存在校验错误时保存无意义/不可行
+          disabled={!dirty || errorTexts.length > 0}
+          onClick={() => {
+            void apply()
+          }}
+        >
+          保存
+        </button>
       </footer>
+
+      {confirming && (
+        <div
+          className={styles['confirm-mask']}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="未保存的修改"
+        >
+          <div className={styles.confirm}>
+            <p className={styles['confirm-text']}>有未保存的修改, 是否保存?</p>
+            <div className={styles['confirm-actions']}>
+              <button
+                className={`${shared.btn} ${shared['btn-ghost']}`}
+                autoFocus={errorTexts.length > 0}
+                onClick={() => setConfirming(false)}
+              >
+                取消
+              </button>
+              <button className={`${shared.btn} ${shared['btn-ghost']}`} onClick={discardAndClose}>
+                不保存
+              </button>
+              <button
+                className={`${shared.btn} ${shared['btn-primary']}`}
+                disabled={errorTexts.length > 0}
+                autoFocus={errorTexts.length === 0}
+                onClick={() => {
+                  void saveAndClose()
+                }}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

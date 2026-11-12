@@ -33,6 +33,21 @@
   border-color: var(--muted);
 }
 
+/* 禁用态不响应 hover, 避免看起来仍可点击 */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-primary:disabled:hover {
+  background: var(--sel);
+}
+
+.btn-ghost:disabled:hover {
+  color: var(--muted);
+  border-color: var(--border);
+}
+
 .link-btn {
   padding: 2px 4px;
   background: none;
