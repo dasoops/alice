@@ -493,7 +493,15 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
       </div>
 
       <footer className={styles.status}>
-        <span className={styles['status-path']}>{configDir}</span>
+        <button
+          className={styles['status-path']}
+          title={`打开 ${configDir}`}
+          onClick={() => {
+            void window.popup.openConfigDir()
+          }}
+        >
+          {configDir}
+        </button>
         <span
           className={`${styles['status-save']}${dirty ? ` ${styles['is-dirty']}` : ''}${
             errorTexts.length ? ` ${styles['has-error']}` : ''

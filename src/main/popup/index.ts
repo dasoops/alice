@@ -1,5 +1,5 @@
-import { BrowserWindow, dialog, ipcMain, screen, type IpcMainEvent } from 'electron'
-import { stat } from 'fs/promises'
+import { BrowserWindow, dialog, ipcMain, screen, shell, type IpcMainEvent } from 'electron'
+import { mkdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
@@ -217,6 +217,12 @@ export class PopupManager {
 
   private registerSettingsHandlers(): void {
     ipcMain.handle('popup:config-dir', () => configDir)
+    // 目录可能尚未生成(未写入过配置), 打开前确保存在
+    ipcMain.handle('popup:config-dir:open', async () => {
+      await mkdir(configDir, { recursive: true })
+      const failure = await shell.openPath(configDir)
+      if (failure) log.warn('open config dir failed', failure)
+    })
     ipcMain.handle('popup:settings:read', () => readSettings(this.confs))
     ipcMain.handle('popup:settings:write', (_event, patch: SettingsData) =>
       writeSettings(this.confs, patch)

@@ -16,6 +16,7 @@ const popup = {
     ipcRenderer.send('popup:resize', height)
   },
   configDir: (): Promise<string> => ipcRenderer.invoke('popup:config-dir'),
+  openConfigDir: (): Promise<void> => ipcRenderer.invoke('popup:config-dir:open'),
   settingsRead: (): Promise<SettingsData> => ipcRenderer.invoke('popup:settings:read'),
   settingsWrite: (patch: SettingsData): Promise<SettingsData> =>
     ipcRenderer.invoke('popup:settings:write', patch),

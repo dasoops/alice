@@ -6,6 +6,7 @@ export interface PopupApi {
   cancel: () => void
   resize: (height: number) => void
   configDir: () => Promise<string>
+  openConfigDir: () => Promise<void>
   settingsRead: () => Promise<SettingsData>
   settingsWrite: (patch: SettingsData) => Promise<SettingsData>
   pickFile: (options?: { title?: string }) => Promise<string | null>

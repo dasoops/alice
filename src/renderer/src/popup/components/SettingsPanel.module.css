@@ -290,6 +290,19 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  /* 作为按钮复位默认样式, 保持与相邻状态文本一致的视觉 */
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.status-path:hover {
+  color: var(--fg);
+  text-decoration: underline;
 }
 
 .status-save {
