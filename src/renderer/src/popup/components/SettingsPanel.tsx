@@ -177,7 +177,10 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
   return (
     <div className={styles.panel} role="dialog" aria-modal="true" aria-label="设置">
       <header className={styles['panel-bar']}>
-        <span className={styles['panel-title']}>设置</span>
+        <div className={styles['panel-heading']}>
+          <span className={styles['panel-title']}>设置</span>
+          <span className={styles['panel-version']}>v{__APP_VERSION__}</span>
+        </div>
         <button className={shared['icon-btn']} aria-label="关闭" onClick={requestClose}>
           ✕
         </button>

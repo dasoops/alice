@@ -26,9 +26,22 @@
   -webkit-app-region: no-drag;
 }
 
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .panel-title {
   font-size: 13px;
   color: var(--fg);
+}
+
+/* 版本号只是辅助信息, 弱化以避免与标题争夺注意力 */
+.panel-version {
+  font-family: var(--font-mono), serif;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .panel-body {
