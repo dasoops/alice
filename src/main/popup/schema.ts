@@ -24,7 +24,7 @@ export function readSettings(confs: SettingsConfs): SettingsData {
       sync: { mode: reader.sync.mode },
       status: {
         ...reader.status,
-        formats: reader.status.formats.map((item) => ({ ...item }))
+        formats: [...reader.status.formats]
       }
     },
     webdav: {

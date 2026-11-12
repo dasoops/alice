@@ -131,39 +131,39 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
   const currentRegex = (): string[] => draft.reader.txt.chapterRegex
 
   const selectFormat = (index: number): void => {
-    setDraft('reader', 'status', {
-      ...draft.reader.status,
-      formats: draft.reader.status.formats.map((item, i) => ({
-        ...item,
-        enabled: i === index
-      }))
-    })
+    setDraft('reader', 'status', { ...draft.reader.status, formatIndex: index })
   }
 
   const updateFormat = (index: number, template: string): void => {
     setDraft('reader', 'status', {
       ...draft.reader.status,
-      formats: draft.reader.status.formats.map((item, i) =>
-        i === index ? { ...item, template } : item
-      )
+      formats: draft.reader.status.formats.map((item, i) => (i === index ? template : item))
     })
   }
 
   const addFormat = (): void => {
     setDraft('reader', 'status', {
       ...draft.reader.status,
-      formats: [...draft.reader.status.formats, { template: '', enabled: false }]
+      formats: [...draft.reader.status.formats, '']
     })
   }
 
   const removeFormat = (index: number): void => {
-    const formats = draft.reader.status.formats
+    const { formats, formatIndex } = draft.reader.status
     if (formats.length <= 1) return
-    const removedEnabled = formats[index].enabled
     const next = formats.filter((_it, i) => i !== index)
-    // 删除当前启用项后自动启用首项, 避免出现无格式可用的空状态
-    if (removedEnabled && next.length > 0) next[0] = { ...next[0], enabled: true }
-    setDraft('reader', 'status', { ...draft.reader.status, formats: next })
+    // 删除启用项时顺延到相邻项; 删除前置项时索引前移
+    const nextIndex =
+      index < formatIndex
+        ? formatIndex - 1
+        : index === formatIndex
+          ? Math.min(formatIndex, next.length - 1)
+          : formatIndex
+    setDraft('reader', 'status', {
+      ...draft.reader.status,
+      formats: next,
+      formatIndex: nextIndex
+    })
   }
 
   return (
@@ -345,37 +345,40 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
         <div className={`${styles.row} ${styles['row-block']}`}>
           <span className={styles['row-key']}>格式</span>
           <div className={styles['format-list']}>
-            {draft.reader.status.formats.map((format, index) => (
-              <div className={styles['format-item']} key={index}>
-                <label className={styles.radio}>
+            {draft.reader.status.formats.map((format, index) => {
+              const active = draft.reader.status.formatIndex === index
+              return (
+                <div className={styles['format-item']} key={index}>
+                  <label className={styles.radio}>
+                    <input
+                      type="radio"
+                      name="statusFormat"
+                      aria-label={`启用格式 ${index + 1}`}
+                      checked={active}
+                      onChange={() => selectFormat(index)}
+                    />
+                    <span className={styles['radio-mark']} aria-hidden="true" />
+                  </label>
                   <input
-                    type="radio"
-                    name="statusFormat"
-                    aria-label={`启用格式 ${index + 1}`}
-                    checked={format.enabled}
-                    onChange={() => selectFormat(index)}
+                    className={`${shared.input} ${shared['input-flex']} ${shared['is-mono']}${
+                      active && errors.statusFormats ? ` ${shared['is-invalid']}` : ''
+                    }`}
+                    type="text"
+                    value={format}
+                    placeholder="例如 {chapter} · {page}/{total}"
+                    ref={active ? registerField('statusFormats') : undefined}
+                    onChange={(event) => updateFormat(index, event.target.value)}
                   />
-                  <span className={styles['radio-mark']} aria-hidden="true" />
-                </label>
-                <input
-                  className={`${shared.input} ${shared['input-flex']} ${shared['is-mono']}${
-                    format.enabled && errors.statusFormats ? ` ${shared['is-invalid']}` : ''
-                  }`}
-                  type="text"
-                  value={format.template}
-                  placeholder="例如 {chapter} · {page}/{total}"
-                  ref={format.enabled ? registerField('statusFormats') : undefined}
-                  onChange={(event) => updateFormat(index, event.target.value)}
-                />
-                <button
-                  className={`${shared['link-btn']} ${shared['link-danger']} ${styles['delete-btn']}`}
-                  disabled={draft.reader.status.formats.length <= 1}
-                  onClick={() => removeFormat(index)}
-                >
-                  删除
-                </button>
-              </div>
-            ))}
+                  <button
+                    className={`${shared['link-btn']} ${shared['link-danger']} ${styles['delete-btn']}`}
+                    disabled={draft.reader.status.formats.length <= 1}
+                    onClick={() => removeFormat(index)}
+                  >
+                    删除
+                  </button>
+                </div>
+              )
+            })}
             <button className={shared['link-btn']} onClick={addFormat}>
               + 新建
             </button>

@@ -47,7 +47,8 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
   const positiveInt = (value: number): string | undefined =>
     value >= 1 && Number.isInteger(value) ? undefined : '需为大于 0 的整数'
   const required = (value: string): string | undefined => (value.trim() ? undefined : '不能为空')
-  const activeFormats = draft.reader.status.formats.filter((item) => item.enabled)
+  const { formats, formatIndex } = draft.reader.status
+  const activeFormat = formats[formatIndex]
   const errors: SettingsErrors = {
     file: required(draft.reader.file.trim()),
     chunkSize: positiveInt(draft.reader.chunkSize),
@@ -64,13 +65,11 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
     }),
     statusFormats: !draft.reader.status.enabled
       ? undefined
-      : activeFormats.length === 0
+      : formatIndex < 0 || formatIndex >= formats.length
         ? '请选择一个启用格式'
-        : activeFormats.length > 1
-          ? '只能启用一个格式'
-          : !activeFormats[0].template.trim()
-            ? '启用格式不能为空'
-            : undefined,
+        : !activeFormat?.trim()
+          ? '启用格式不能为空'
+          : undefined,
     // WebDav 未启用时地址/目录可留空, 启用后必须配置
     url: draft.webdav.enabled ? required(draft.webdav.url) : undefined,
     directory: draft.webdav.enabled ? required(draft.webdav.directory) : undefined

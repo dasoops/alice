@@ -205,8 +205,8 @@ export class Reader extends EventEmitter<ReaderEvents> {
     const config = this.conf.get('status')
     if (!config.enabled) return { config }
     // 当前格式不使用页码时跳过整章分页, 避免大文本无谓扫描
-    const active = config.formats.find((item) => item.enabled)
-    const withPageInfo = active ? /\{(?:page|total)\}/.test(active.template) : false
+    const template = config.formats[config.formatIndex] ?? ''
+    const withPageInfo = /\{(?:page|total)\}/.test(template)
     try {
       return { config, progress: book.readingProgress(options, pageEnd, withPageInfo) }
     } catch (err) {

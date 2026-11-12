@@ -10,17 +10,13 @@ export type StatusCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-ri
 // plain: 同正文样式(字号小 2px, 无背景); badge: 独立样式(带背景角标)
 export type StatusStyle = 'plain' | 'badge'
 
-// 可编辑的展示格式; 同一时间最多一项 enabled
-export type StatusFormat = {
-  template: string
-  enabled: boolean
-}
-
 export type StatusConfig = {
   enabled: boolean
   corner: StatusCorner
   style: StatusStyle
-  formats: StatusFormat[]
+  // 可选格式列表, formatIndex 指向当前启用项
+  formats: string[]
+  formatIndex: number
 }
 
 export type Config = {
@@ -54,11 +50,17 @@ export const Config: { Default: Config } = {
       corner: 'bottom-right',
       // 默认独立样式, 与正文区分更清楚
       style: 'badge',
-      // 预设常用格式, 均可在设置中编辑; 第一项默认启用
+      // 预设常用格式, 均可在设置中编辑; formatIndex 默认启用第一项
       formats: [
-        { template: '{chapter} · {page}/{total} · {percent}%', enabled: true },
-        { template: '{chapter} · {page}/{total}', enabled: false }
-      ]
+        '{chapter} · {page}/{total} · {percent}%',
+        '{chapter} · {page}/{total}',
+        '{chapter} · {percent}%',
+        '{page}/{total} · {percent}%',
+        '{chapter}',
+        '{page}/{total}',
+        '{percent}%'
+      ],
+      formatIndex: 0
     },
     recent: []
   }

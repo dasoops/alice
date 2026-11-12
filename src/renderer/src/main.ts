@@ -19,9 +19,9 @@ function renderStatus(): void {
     return
   }
 
-  const format = config.formats.find((item) => item.enabled)
-  const text = format
-    ? renderStatusTemplate(format.template, {
+  const template = config.formats[config.formatIndex] ?? ''
+  const text = template
+    ? renderStatusTemplate(template, {
         chapter: progress.chapterTitle,
         page: String(progress.page ?? ''),
         total: String(progress.pageTotal ?? ''),
