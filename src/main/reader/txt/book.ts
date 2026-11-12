@@ -82,10 +82,16 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     }
   }
 
-  readingProgress(options: PageOptions, pageEnd?: number): ReadingProgress {
+  readingProgress(options: PageOptions, pageEnd?: number, withPageInfo = true): ReadingProgress {
     // 页起点可能是上一页末尾的换行符, 章节归属应按该页首个正文字符判断
     const index = this.displayIndex()
     const chapter = findChapterAt(this.chapters, index, this._chapter) ?? this._chapter
+    // 优先复用 readPage 返回的页尾, 单独请求进度时再按当前位置计算
+    const end = pageEnd ?? nextPage(this.content, this.index, 0, options)
+    const percent = this.content.length > 0 ? end / this.content.length : 0
+
+    if (!withPageInfo) return { chapterTitle: chapter.title, percent }
+
     const { current, total } = this.pageIndex.info({
       chapterIndex: chapter.index,
       content: this.content,
@@ -94,9 +100,6 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
       index,
       options
     })
-    // 优先复用 readPage 返回的页尾, 单独请求进度时再按当前位置计算
-    const end = pageEnd ?? nextPage(this.content, this.index, 0, options)
-    const percent = this.content.length > 0 ? end / this.content.length : 0
     return {
       chapterTitle: chapter.title,
       page: percent >= 1 ? total : current,

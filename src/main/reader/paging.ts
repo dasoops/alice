@@ -55,6 +55,17 @@ export function pageRange(
   return { begin, end }
 }
 
+// 收集 [from, end) 内的换行位置; 分页时复用, 避免逐字符扫描
+function newlinePositions(content: string, from: number, end: number): number[] {
+  const positions: number[] = []
+  let index = content.indexOf(lineSeparator, from)
+  while (index !== -1 && index < end) {
+    positions.push(index)
+    index = content.indexOf(lineSeparator, index + 1)
+  }
+  return positions
+}
+
 // 从 from 起按页切分到 end(不含), 返回各页起始偏移; 末页在 end 处截断
 export function pageStarts(
   content: string,
@@ -62,15 +73,35 @@ export function pageStarts(
   end: number,
   options: { maxLine: number; chunkSize: number }
 ): number[] {
+  const { maxLine, chunkSize } = options
+  if (from >= end || maxLine < 1 || chunkSize < 1) return [from]
+
+  const newlines = newlinePositions(content, from, end)
   const starts: number[] = []
   let start = from
+  // 指向第一个大于当前页起点的换行符
+  let cursor = 0
+
   while (start < end) {
     starts.push(start)
-    const next = Math.min(nextPage(content, start, 0, options), end)
-    // 分页参数非法(如 maxLine/chunkSize 为 0)时避免死循环
-    if (next <= start) break
-    start = next
+
+    const limit = Math.min(start + chunkSize, end)
+    while (cursor < newlines.length && newlines[cursor] <= start) cursor++
+
+    let next = cursor
+    let line = 0
+    while (next < newlines.length && newlines[next] <= limit && line < maxLine) {
+      line++
+      next++
+    }
+
+    // 到达 maxLine 时页尾是该换行符本身, 否则受 chunkSize/末尾截断
+    const pageEnd = line >= maxLine ? newlines[next - 1] : limit
+    cursor = next
+    if (pageEnd <= start) break
+    start = pageEnd
   }
+
   // 空区间也占一页, 避免页码出现 0/0
   return starts.length > 0 ? starts : [from]
 }

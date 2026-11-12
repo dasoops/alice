@@ -157,6 +157,14 @@ describe('Book', () => {
     })
   })
 
+  it('不需要页码时不计算章内分页', () => {
+    const book = makeBook()
+    expect(book.readingProgress({ maxLine: 99, chunkSize: 4 }, 4, false)).toEqual({
+      chapterTitle: '第1章',
+      percent: 4 / 26
+    })
+  })
+
   it('带分页参数的 setPosition 会把恢复位置吸附到页起点', () => {
     const book = makeBook()
     const chunked = { maxLine: 99, chunkSize: 4 }

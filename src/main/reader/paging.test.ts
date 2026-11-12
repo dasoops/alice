@@ -40,6 +40,15 @@ describe('pageStarts', () => {
   it('分页参数非法时不死循环', () => {
     expect(pageStarts('abcdef', 0, 6, { maxLine: 1, chunkSize: 0 })).toEqual([0])
   })
+
+  it('按行数切页时以换行符作为下一页起点', () => {
+    expect(pageStarts('1\n2\n3\n4\n5', 0, 9, { maxLine: 2, chunkSize: 100 })).toEqual([0, 3, 7])
+  })
+
+  it('行数与字符数先到为准', () => {
+    // 第1页先到达 4 字符上限, 第2页再按行数切
+    expect(pageStarts('abcdef\ngh', 0, 9, { maxLine: 1, chunkSize: 4 })).toEqual([0, 4, 6])
+  })
 })
 
 describe('pageInfo', () => {

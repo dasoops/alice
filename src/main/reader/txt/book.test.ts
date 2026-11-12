@@ -138,6 +138,15 @@ describe('Book', () => {
     })
   })
 
+  it('不需要页码时不计算章内分页', () => {
+    const book = makeBook()
+    book.setPosition({ chapterIndex: 1, chapterPos: 0 })
+    expect(book.readingProgress({ maxLine: 99, chunkSize: 4 }, undefined, false)).toEqual({
+      chapterTitle: '第1章 开始',
+      percent: 9 / 26
+    })
+  })
+
   it('默认分页下角标章节与实际页内容一致', () => {
     const book = makeBook()
     const paging = { maxLine: 1, chunkSize: 40 }

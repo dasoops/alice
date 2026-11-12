@@ -57,7 +57,7 @@ export const Config: { Default: Config } = {
       // 预设常用格式, 均可在设置中编辑; 第一项默认启用
       formats: [
         { template: '{chapter} · {page}/{total} · {percent}%', enabled: true },
-        { template: '{chapter} · {page}/{total}', enabled: false },
+        { template: '{chapter} · {page}/{total}', enabled: false }
       ]
     },
     recent: []

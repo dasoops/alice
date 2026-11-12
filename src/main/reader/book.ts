@@ -23,11 +23,12 @@ export type Chapter = {
   legadoIndex?: number
 }
 
-// 阅读角标所需的进度: 本章页码从 1 开始, percent 为全书已读字符占比 [0, 1]
+// 阅读角标所需的进度: percent 为全书已读字符占比 [0, 1];
+// page/pageTotal 在展示格式不需要页码时省略, 避免大文本做无用的整章分页
 export type ReadingProgress = {
   chapterTitle: string
-  page: number
-  pageTotal: number
+  page?: number
+  pageTotal?: number
   percent: number
 }
 
@@ -55,8 +56,9 @@ export interface Book extends EventEmitter<BookEvents> {
   chapter(): Chapter
   // 相对当前定位返回一页文本并推进定位; offset 为 0 时读取当前页
   readPage(offset: number, options: PageOptions): PageRead
-  // 按当前分页参数计算本章页码与全书字符进度; pageEnd 已由 readPage 算出时传入以复用
-  readingProgress(options: PageOptions, pageEnd?: number): ReadingProgress
+  // 按当前分页参数计算本章页码与全书字符进度; pageEnd 已由 readPage 算出时传入以复用;
+  // withPageInfo 为 false 时跳过整章分页, 仅返回章节名与百分比
+  readingProgress(options: PageOptions, pageEnd?: number, withPageInfo?: boolean): ReadingProgress
   // lines / jumpLine txt 独有, 显式可选
   lines?(): { current: number; total: number }
   // 返回新定位或 undefined(行不存在)

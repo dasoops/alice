@@ -198,8 +198,11 @@ export class Reader extends EventEmitter<ReaderEvents> {
   private statusOf(book: Book, options: PageOptions, pageEnd?: number): ReaderStatus {
     const config = this.conf.get('status')
     if (!config.enabled) return { config }
+    // 当前格式不使用页码时跳过整章分页, 避免大文本无谓扫描
+    const active = config.formats.find((item) => item.enabled)
+    const withPageInfo = active ? /\{(?:page|total)\}/.test(active.template) : false
     try {
-      return { config, progress: book.readingProgress(options, pageEnd) }
+      return { config, progress: book.readingProgress(options, pageEnd, withPageInfo) }
     } catch (err) {
       log.warn(`Reader ==> 计算阅读进度失败: ${err}`)
       return { config }

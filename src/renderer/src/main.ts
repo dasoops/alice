@@ -23,8 +23,8 @@ function renderStatus(): void {
   const text = format
     ? renderStatusTemplate(format.template, {
         chapter: progress.chapterTitle,
-        page: String(progress.page),
-        total: String(progress.pageTotal),
+        page: String(progress.page ?? ''),
+        total: String(progress.pageTotal ?? ''),
         percent: String(Math.floor(progress.percent * 100))
       })
     : ''
