@@ -1,4 +1,4 @@
-# alice-ts
+# alice
 
 A minimal Electron application with TypeScript
 
