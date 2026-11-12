@@ -13,6 +13,8 @@ import {
 } from '../lib/validateSettings'
 import type { SettingsData } from '../../../../main/popup/types'
 
+type ChapterRegexItem = SettingsData['reader']['txt']['chapterRegex'][number]
+
 export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Element {
   const [draft, setDraft0] = useState<SettingsData>(data)
   const originalRef = useRef(data)
@@ -128,7 +130,13 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  const currentRegex = (): string[] => draft.reader.txt.chapterRegex
+  const currentRegex = (): ChapterRegexItem[] => draft.reader.txt.chapterRegex
+
+  const updateRegex = (index: number, patch: Partial<ChapterRegexItem>): void => {
+    setDraft('reader', 'txt', {
+      chapterRegex: currentRegex().map((item, i) => (i === index ? { ...item, ...patch } : item))
+    })
+  }
 
   const selectFormat = (index: number): void => {
     setDraft('reader', 'status', { ...draft.reader.status, formatIndex: index })
@@ -251,19 +259,29 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
           <span className={styles['row-key']}>章节正则</span>
           <div className={styles['regex-list']}>
             {currentRegex().map((regex, index) => (
-              <div className={styles['regex-item']} key={index}>
+              <div
+                className={`${styles['regex-item']}${
+                  regex.enabled ? '' : ` ${styles['is-disabled']}`
+                }`}
+                key={index}
+              >
+                <label className={styles.checkbox} title="启用该正则">
+                  <input
+                    type="checkbox"
+                    aria-label={`启用正则 ${index + 1}`}
+                    checked={regex.enabled}
+                    onChange={(event) => updateRegex(index, { enabled: event.target.checked })}
+                  />
+                  <span className={styles['checkbox-mark']} aria-hidden="true" />
+                </label>
                 <input
                   className={`${shared.input} ${shared['input-flex']} ${shared['is-mono']}${
                     errors.regex[index] ? ` ${shared['is-invalid']}` : ''
                   }`}
                   type="text"
-                  value={regex}
+                  value={regex.pattern}
                   ref={registerField(`regex:${index}`)}
-                  onChange={(event) => {
-                    const nextList = [...currentRegex()]
-                    nextList[index] = event.target.value
-                    setDraft('reader', 'txt', { chapterRegex: nextList })
-                  }}
+                  onChange={(event) => updateRegex(index, { pattern: event.target.value })}
                 />
                 <button
                   className={`${shared['link-btn']} ${shared['link-danger']}`}
@@ -278,7 +296,11 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
             ))}
             <button
               className={shared['link-btn']}
-              onClick={() => setDraft('reader', 'txt', { chapterRegex: [...currentRegex(), ''] })}
+              onClick={() =>
+                setDraft('reader', 'txt', {
+                  chapterRegex: [...currentRegex(), { pattern: '', enabled: true }]
+                })
+              }
             >
               + 添加
             </button>

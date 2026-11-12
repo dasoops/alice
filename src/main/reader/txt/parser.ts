@@ -14,8 +14,9 @@ export class Parser implements BaseParser {
     private readonly filePath: string,
     private readonly conf: TxtConfig
   ) {
-    this.chapterRegexes = compileRegexes(this.conf.chapterRegex ?? [], (pattern) =>
-      error(`无效的章节正则: ${pattern}`)
+    this.chapterRegexes = compileRegexes(
+      (this.conf.chapterRegex ?? []).filter((item) => item.enabled).map((item) => item.pattern),
+      (pattern) => error(`无效的章节正则: ${pattern}`)
     )
   }
 

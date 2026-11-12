@@ -3,7 +3,24 @@ import { dataDir } from '../util'
 import type { Position } from './book'
 import type { SyncMode } from './sync/progress'
 
-export type TxtConfig = { chapterRegex: string[] }
+export type ChapterRegex = {
+  pattern: string
+  // 关闭的规则保留但不参与匹配, 便于按书籍切换而无需反复增删
+  enabled: boolean
+}
+
+export type TxtConfig = { chapterRegex: ChapterRegex[] }
+
+type StoredTxtConfig = { chapterRegex?: (string | ChapterRegex)[] }
+
+// 旧版配置只保存正则字符串, 启动时补上启用状态
+export function normalizeTxtConfig(stored: StoredTxtConfig | undefined): TxtConfig {
+  return {
+    chapterRegex: (stored?.chapterRegex ?? []).map((item) =>
+      typeof item === 'string' ? { pattern: item, enabled: true } : item
+    )
+  }
+}
 
 export type StatusCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
@@ -41,7 +58,7 @@ export const Config: { Default: Config } = {
     chunkSize: 40,
     txt: {
       // 匹配 "第 x 章 title" 形式的章节标题行, 兼容无空格写法
-      chapterRegex: ['^\\s*第\\s*\\d+\\s*章']
+      chapterRegex: [{ pattern: '^\\s*第\\s*\\d+\\s*章', enabled: true }]
     },
     sync: { mode: 'approximate' },
     status: {

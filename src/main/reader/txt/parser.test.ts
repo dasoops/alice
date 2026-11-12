@@ -34,7 +34,9 @@ describe('Parser', () => {
 
   it('归一化正文并按正则构建章节表', async () => {
     const filePath = write('书名.txt', '前言\r\n第1章 开始\n正文A\r\n第2章 结束\r\n正文B')
-    const parsed = await new Parser(filePath, { chapterRegex: ['^\\s*第\\s*\\d+\\s*章'] }).parse()
+    const parsed = await new Parser(filePath, {
+      chapterRegex: [{ pattern: '^\\s*第\\s*\\d+\\s*章', enabled: true }]
+    }).parse()
 
     expect(parsed.type).toBe('txt')
     expect(parsed.name).toBe('书名')
@@ -50,11 +52,23 @@ describe('Parser', () => {
 
   it('无匹配章节时全书作为单章', async () => {
     const filePath = write('无章节.txt', '只有正文')
-    const parsed = await new Parser(filePath, { chapterRegex: ['^第\\d+章'] }).parse()
+    const parsed = await new Parser(filePath, {
+      chapterRegex: [{ pattern: '^第\\d+章', enabled: true }]
+    }).parse()
     expect(parsed.chapters).toEqual([
       { index: 0, title: '正文', beginChar: 0, endChar: 4, legadoIndex: 0 }
     ])
     expect((parsed as Book).content).toBe('只有正文')
+  })
+
+  it('关闭的正则不参与章节匹配', async () => {
+    const filePath = write('关闭正则.txt', '第1章 开始\r\n正文')
+    const parsed = await new Parser(filePath, {
+      chapterRegex: [{ pattern: '^第\\d+章', enabled: false }]
+    }).parse()
+    expect(parsed.chapters).toEqual([
+      { index: 0, title: '正文', beginChar: 0, endChar: 9, legadoIndex: 0 }
+    ])
   })
 })
 

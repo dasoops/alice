@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { Conf } from 'electron-conf'
+import { normalizeTxtConfig } from './reader/config'
 import { Config as ReaderConfig, Reader } from './reader'
 import { Config as WebDavConfig, WebDavClient } from './webdav'
 import { Config as ShortcutConfig, ShortcutManager } from './shortcut'
@@ -30,17 +31,23 @@ function registerConfig(): {
   webdav: Conf<WebDavConfig>
 } {
   const extra = { dir: configDir }
+  const reader = new Conf<ReaderConfig>({
+    name: 'reader',
+    defaults: ReaderConfig.Default,
+    ...extra
+  })
+  // 旧版章节正则为纯字符串数组, 迁移为带开关的结构; 仅旧数据需要写回
+  const legacyTxt = reader.get('txt') as unknown as Parameters<typeof normalizeTxtConfig>[0]
+  if (legacyTxt?.chapterRegex?.some((item) => typeof item === 'string')) {
+    reader.set('txt', normalizeTxtConfig(legacyTxt))
+  }
   return {
     window: new Conf<WindowConfig>({
       name: 'window',
       defaults: WindowConfig.Default,
       ...extra
     }),
-    reader: new Conf<ReaderConfig>({
-      name: 'reader',
-      defaults: ReaderConfig.Default,
-      ...extra
-    }),
+    reader,
     shortcut: new Conf<ShortcutConfig>({
       name: 'shortcut',
       defaults: ShortcutConfig.Default,

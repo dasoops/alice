@@ -20,7 +20,7 @@ export function readSettings(confs: SettingsConfs): SettingsData {
       file: reader.file,
       chunkSize: reader.chunkSize,
       maxLine: reader.maxLine,
-      txt: { chapterRegex: [...reader.txt.chapterRegex] },
+      txt: { chapterRegex: reader.txt.chapterRegex.map((item) => ({ ...item })) },
       sync: { mode: reader.sync.mode },
       status: {
         ...reader.status,

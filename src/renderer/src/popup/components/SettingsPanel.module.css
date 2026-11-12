@@ -86,6 +86,60 @@
   gap: 8px;
 }
 
+/* 关闭的规则仍可编辑, 仅弱化显示提示不参与匹配 */
+.regex-item.is-disabled input[type='text'] {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  cursor: pointer;
+}
+
+.checkbox input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.checkbox-mark {
+  position: relative;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+}
+
+.checkbox-mark::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 3px;
+  height: 6px;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+}
+
+.checkbox input:checked + .checkbox-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.checkbox input:checked + .checkbox-mark::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.checkbox input:focus-visible + .checkbox-mark {
+  outline: 2px solid var(--number);
+  outline-offset: 2px;
+}
+
 .input-number {
   width: 76px;
   flex: none;

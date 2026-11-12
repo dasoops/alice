@@ -54,7 +54,9 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
     chunkSize: positiveInt(draft.reader.chunkSize),
     maxLine: positiveInt(draft.reader.maxLine),
     regex: draft.reader.txt.chapterRegex.map((item) => {
-      const pattern = item.trim()
+      // 关闭的规则不参与匹配, 非法内容不应阻塞保存
+      if (!item.enabled) return undefined
+      const pattern = item.pattern.trim()
       if (!pattern) return '不能为空'
       try {
         new RegExp(pattern)
