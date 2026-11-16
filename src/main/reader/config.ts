@@ -50,6 +50,9 @@ export type Config = {
   recent: string[]
 }
 
+// 设置面板可编辑的部分; position/recent 为运行状态, 由 Reader 自行维护
+export type ConfigPatch = Omit<Config, 'position' | 'recent'>
+
 export const Config: { Default: Config } = {
   Default: {
     file: path.join(dataDir, 'notFound.txt'),

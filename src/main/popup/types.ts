@@ -1,4 +1,4 @@
-import type { Config as ReaderConfig } from '../reader'
+import type { ConfigPatch } from '../reader'
 import type { Config as WebDavConfig } from '../webdav'
 import type { Config as ShortcutConfig } from '../shortcut'
 
@@ -60,8 +60,8 @@ export type PopupChapterGroup = {
   collapsible: boolean
 }
 
-// 与 ReaderConfig 同构(剔除运行状态 position 与 recent)
-export type ReaderSettings = Omit<ReaderConfig, 'position' | 'recent'>
+// 设置面板的 reader 契约, 与本地配置的可编辑字段同构
+export type ReaderSettings = ConfigPatch
 
 export type WebDavSettings = WebDavConfig
 

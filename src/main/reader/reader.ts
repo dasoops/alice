@@ -11,7 +11,7 @@ import { WebDavClient } from '../webdav'
 import { ProgressSync, type SyncTrigger } from './sync/sync'
 import { compareProgress, type BookProgress, type SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
-import { Config, type StatusConfig } from './config'
+import { Config, type ConfigPatch, type StatusConfig } from './config'
 import type { PopupManager } from '../popup'
 
 // 最近阅读保留的最大条数
@@ -82,22 +82,38 @@ export class Reader extends EventEmitter<ReaderEvents> {
     return (await this.book()).chapter()
   }
 
-  public async setFile(path: string): Promise<void> {
-    if (!path) throw Error('无效文件路径')
+  // reader 配置的唯一写入点: 其余字段原地落盘, file 交给 switchBook;
+  // 解析/进度重置/同步等切书副作用只能在入口内完成
+  public async applySettings(patch: ConfigPatch): Promise<void> {
+    const current = this.conf.store
+    this.conf.store = {
+      ...patch,
+      file: current.file,
+      position: current.position,
+      recent: current.recent
+    }
+    const file = patch.file.trim()
+    if (file && file !== current.file) await this.switchBook(file)
+  }
+
+  public async switchBook(file: string): Promise<void> {
+    if (!file) throw Error('无效文件路径')
+    // 点击当前书籍不重载, 避免重置阅读进度
+    if (file === this._book?.path) return
     const previous = this.conf.get('file')
-    this.conf.set('file', path)
+    this.conf.set('file', file)
     this.conf.reset('position')
     this.promptedRemote = undefined
     // 解析可能较慢(epub 解压), 先通知渲染进程展示 loading, 避免停留在旧书
     this.mainWindow.webContents.send('loading')
     let loaded: string
     try {
-      loaded = await this.load(path)
+      loaded = await this.load(file)
     } catch (err) {
       // 解析失败(如 epub 无正文章节)回滚文件配置, 保持旧书, 阻止切换
       this.conf.set('file', previous)
       this.mainWindow.webContents.send('loading-hide')
-      error(`无法打开书籍: ${path}`)
+      error(`无法打开书籍: ${file}`)
       log.warn(`Reader ==> 打开书籍失败: ${err}`)
       return
     }

@@ -3,7 +3,7 @@ import { mkdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
-import { readSettings, writeSettings, type SettingsConfs } from './schema'
+import { readSettings, type SettingsConfs } from './schema'
 import { buildChapterGroups } from './volumes'
 import { configDir } from '../util'
 import type {
@@ -12,8 +12,7 @@ import type {
   PopupMessageOptions,
   PopupMode,
   PopupPromptOptions,
-  PopupSettingsOptions,
-  SettingsData
+  PopupSettingsOptions
 } from './types'
 
 const BAND_MIN_HEIGHT = 56
@@ -223,10 +222,6 @@ export class PopupManager {
       const failure = await shell.openPath(configDir)
       if (failure) log.warn('open config dir failed', failure)
     })
-    ipcMain.handle('popup:settings:read', () => readSettings(this.confs))
-    ipcMain.handle('popup:settings:write', (_event, patch: SettingsData) =>
-      writeSettings(this.confs, patch)
-    )
     ipcMain.handle('popup:settings:pick-file', async (_event, options?: { title?: string }) => {
       const { canceled, filePaths } = await dialog.showOpenDialog(this.mainWindow, {
         title: options?.title ?? '选择阅读文件',

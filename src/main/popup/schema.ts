@@ -1,5 +1,5 @@
 import type { Conf } from 'electron-conf'
-import type { Config as ReaderConfig } from '../reader'
+import type { Config as ReaderConfig, Reader } from '../reader'
 import type { Config as WebDavConfig } from '../webdav'
 import type { Config as ShortcutConfig } from '../shortcut'
 import type { SettingsData } from './types'
@@ -44,15 +44,16 @@ export function readSettings(confs: SettingsConfs): SettingsData {
   }
 }
 
-// 校验与规范化统一在渲染层完成, 主进程仅做透传回填;
-// position/recent 为运行状态, 不属于设置契约, 回填时从当前 store 保留
-export function writeSettings(confs: SettingsConfs, patch: SettingsData): SettingsData {
-  confs.reader.store = {
-    ...patch.reader,
-    position: confs.reader.store.position,
-    recent: confs.reader.store.recent
-  }
+// 每类配置由所有者应用: webdav/shortcut 无缓存状态, 直写 conf 后由各自监听生效;
+// reader 的 file 切换伴随解析/进度重置等副作用, 必须经 Reader 入口
+export async function applySettings(
+  confs: SettingsConfs,
+  reader: Pick<Reader, 'applySettings'>,
+  patch: SettingsData
+): Promise<SettingsData> {
   confs.webdav.store = patch.webdav
   confs.shortcut.store = patch.shortcut
-  return patch
+  await reader.applySettings(patch.reader)
+  // 回读真实落盘值: 切书失败会回滚文件配置, 面板据此更新已保存基线
+  return readSettings(confs)
 }

@@ -112,7 +112,7 @@ export class TrayManager {
         enabled: recent.length > 0,
         submenu: recent.map((file) => ({
           label: path.basename(file),
-          click: () => this.switchBook(file)
+          click: () => this.reader.switchBook(file).then(null)
         }))
       },
       { label: '打开阅读文件', click: () => this.openReadFile() },
@@ -160,13 +160,6 @@ export class TrayManager {
     log.info(`TrayManager ==> destroy`)
     this.tray?.destroy()
     this.tray = undefined
-  }
-
-  async switchBook(file: string): Promise<void> {
-    await this.initlization
-    // 点击当前书籍不重载, 避免重置阅读进度
-    if ((await this.reader.book()).path === file) return
-    await this.reader.setFile(file)
   }
 
   async openReadFile(): Promise<void> {
@@ -247,7 +240,7 @@ export class TrayManager {
       ]
     })
     if (canceled) return
-    await this.reader.setFile(filePaths[0])
+    await this.reader.switchBook(filePaths[0])
   }
 
   async pullProgress(): Promise<void> {

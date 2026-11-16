@@ -11,6 +11,8 @@ import { configDir } from './util'
 import { TrayManager } from './tray'
 import { Store } from './store'
 import { PopupManager } from './popup'
+import { applySettings, readSettings, type SettingsConfs } from './popup/schema'
+import type { SettingsData } from './popup/types'
 
 export type WindowConfig = {
   penetrate: boolean
@@ -170,12 +172,19 @@ app.whenReady().then(async () => {
 
   const store = new Store()
 
+  // 设置面板 / Reader / WebDav / 快捷键共享同一组 conf 实例
+  const settingsConfs: SettingsConfs = {
+    reader: conf.reader,
+    webdav: conf.webdav,
+    shortcut: conf.shortcut
+  }
+
   const mainWindow = createWindow({ conf: conf.window, store: store })
 
   // 独立弹窗模块: 承担全部非文件选择的提示/输入交互
   const popupManager = new PopupManager({
     mainWindow: mainWindow,
-    conf: { reader: conf.reader, webdav: conf.webdav, shortcut: conf.shortcut }
+    conf: settingsConfs
   })
   app.on('will-quit', () => popupManager.dispose())
 
@@ -197,6 +206,12 @@ app.whenReady().then(async () => {
     webdav: webdav,
     popup: popupManager
   })
+
+  // 设置读写放在组合根: 写入需经各配置所有者, 其中切书副作用由 Reader 承担
+  ipcMain.handle('popup:settings:read', () => readSettings(settingsConfs))
+  ipcMain.handle('popup:settings:write', (_event, patch: SettingsData) =>
+    applySettings(settingsConfs, reader, patch)
+  )
 
   const ipcSend =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
