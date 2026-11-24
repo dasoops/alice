@@ -1,0 +1,130 @@
+diff --git a/node_modules/@lingo-reader/epub-parser/dist/index.d.ts b/node_modules/@lingo-reader/epub-parser/dist/index.d.ts
+index 417fdc4..48c4223 100644
+--- a/node_modules/@lingo-reader/epub-parser/dist/index.d.ts
++++ b/node_modules/@lingo-reader/epub-parser/dist/index.d.ts
+@@ -230,6 +230,13 @@ declare class EpubFile implements EBookParser {
+      */
+     private navMap;
+     getToc(): EpubToc;
++    /**
++     * <nav epub:type="toc"> in the EPUB3 navigation document.
++     * 卷层级只出现在导航文档中, NCX 常为平铺, 故单独提供;
++     * 仅返回 EPUB3 导航文档, 无 nav 时返回空, 由上层平铺
++     */
++    private navDocument;
++    getNavToc(): EpubToc;
+     /**
+      * <pageList> in .ncx file
+      *  which is default value if there is no <pageList> in epub file
+diff --git a/node_modules/@lingo-reader/epub-parser/dist/index.node.mjs b/node_modules/@lingo-reader/epub-parser/dist/index.node.mjs
+index 3e22a9f..b27e86c 100644
+--- a/node_modules/@lingo-reader/epub-parser/dist/index.node.mjs
++++ b/node_modules/@lingo-reader/epub-parser/dist/index.node.mjs
+@@ -525,6 +525,67 @@ function walkNavMap(output, navPoints, hrefToIdMap, ncxBaseDir) {
+     }
+   }
+ }
++function parseNavDocument(ast, hrefToIdMap, navBaseDir) {
++  const nav = findTocNav(ast);
++  const ol = nav?.ol?.[0];
++  if (!ol) return [];
++  return walkNavList(ol, hrefToIdMap, navBaseDir);
++}
++function findTocNav(node) {
++  const navs = [];
++  const visit = (current) => {
++    if (!current || typeof current !== "object") return;
++    if (Array.isArray(current)) {
++      current.forEach(visit);
++      return;
++    }
++    if (current.nav) {
++      const list = Array.isArray(current.nav) ? current.nav : [current.nav];
++      for (const nav of list) {
++        if (nav && typeof nav === "object") navs.push(nav);
++      }
++    }
++    for (const key of Object.keys(current)) {
++      if (key === "nav") continue;
++      visit(current[key]);
++    }
++  };
++  visit(node);
++  const typed = navs.find((nav) => {
++    const type = nav.$?.["epub:type"] ?? nav.$?.type ?? "";
++    return String(type).split(/\s+/).includes("toc");
++  });
++  return typed ?? navs.find((nav) => nav.ol);
++}
++function walkNavList(ol, hrefToIdMap, navBaseDir) {
++  const output = [];
++  const items = ol.li;
++  if (!items) return output;
++  for (const li of Array.isArray(items) ? items : [items]) {
++    const anchor = li.a?.[0] ?? li.span?.[0];
++    const rawHref = typeof anchor?.$?.href === "string" ? decodeURIComponent(anchor.$.href) : "";
++    const href = rawHref ? HREF_PREFIX + path.joinPosix(navBaseDir, rawHref) : "";
++    const hrefPath = href ? href.slice(HREF_PREFIX.length).split("#")[0] : "";
++    const element = {
++      label: textOf(anchor).trim(),
++      href,
++      id: hrefPath ? hrefToIdMap[hrefPath] ?? "" : "",
++      playOrder: ""
++    };
++    const children = li.ol?.[0];
++    if (children) {
++      element.children = walkNavList(children, hrefToIdMap, navBaseDir);
++    }
++    output.push(element);
++  }
++  return output;
++}
++function textOf(node) {
++  if (typeof node === "string") return node;
++  if (Array.isArray(node)) return textOf(node[0]);
++  if (node && typeof node === "object" && typeof node._ === "string") return node._;
++  return "";
++}
+ function parsePageList(pageList, hrefToIdMap, ncxBaseDir) {
+   let label = "";
+   if (pageList.navLabel) {
+@@ -805,6 +866,7 @@ class EpubFile {
+      *  which is default value if there is no <navMap> in epub file
+      */
+     __publicField(this, "navMap", []);
++    __publicField(this, "navDocument", []);
+     /**
+      * <pageList> in .ncx file
+      *  which is default value if there is no <pageList> in epub file
+@@ -863,6 +925,9 @@ class EpubFile {
+   getToc() {
+     return this.navMap;
+   }
++  getNavToc() {
++    return this.navDocument;
++  }
+   getPageList() {
+     return this.pageList;
+   }
+@@ -921,6 +986,21 @@ class EpubFile {
+       tocPath = res.tocPath;
+       this.spine = res.spine;
+     }
++    const navItem = Object.values(this.manifest).find(
++      (item) => (item.properties ?? "").split(/\s+/).includes("nav")
++    );
++    if (navItem) {
++      try {
++        const navFile = await this.zip.readFile(navItem.href);
++        const navAST = await parsexml(navFile);
++        this.navDocument = parseNavDocument(
++          navAST,
++          this.hrefToIdMap,
++          path.dirname(navItem.href)
++        );
++      } catch {
++      }
++    }
+     if (rootFile.guide) {
+       this.guide = parseGuide(rootFile.guide[0], this.opfDir);
+     }

@@ -1,2 +1,4 @@
 * text=auto eol=crlf
 *.plist text eol=lf
+# patch-package 逐行匹配补丁与产物, CRLF 会导致补丁无法应用
+patches/*.patch text eol=lf
