@@ -189,6 +189,42 @@
   color: var(--muted);
 }
 
+.css-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.css-textarea {
+  width: 100%;
+  min-height: 104px;
+  padding: 8px 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  resize: vertical;
+}
+
+/* 内置预设只读展示当前 CSS, 允许选中复制 */
+.css-textarea:read-only {
+  color: var(--muted);
+  resize: none;
+}
+
+.css-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* 自定义样式较多时换行, 避免挤在一行不可见 */
+.style-group {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
 .radio-group {
   display: flex;
   gap: 18px;

@@ -1,5 +1,6 @@
 import path from 'path'
 import { dataDir } from '../util'
+import type { ReaderStyle } from '../../shared/readerStyle'
 import type { Position } from './book'
 import type { SyncMode } from './sync/progress'
 
@@ -46,6 +47,8 @@ export type Config = {
   sync: { mode: SyncMode }
   // 阅读角标: 章节标题 / 本章页码 / 全书百分比
   status: StatusConfig
+  // 正文样式: 内置预设或自定义 CSS, 由主窗口注入 #content / #status.is-plain
+  style: ReaderStyle
   // 最近打开的文件绝对路径, 按时间倒序, 运行时状态不进入设置契约
   recent: string[]
 }
@@ -82,6 +85,7 @@ export const Config: { Default: Config } = {
       ],
       formatIndex: 0
     },
+    style: { active: 'default', customs: [] },
     recent: []
   }
 }

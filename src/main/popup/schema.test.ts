@@ -18,6 +18,7 @@ function setup(): { confs: SettingsConfs; readerStore: ReaderConfig } {
       formats: ['{chapter}'],
       formatIndex: 0
     },
+    style: { active: 'default', customs: [] },
     recent: ['/books/a.txt']
   }
   const confs = {
@@ -85,5 +86,14 @@ describe('applySettings', () => {
     const saved = await applySettings(confs, { applySettings: applyReader }, patch)
 
     expect(saved.reader.file).toBe('/books/a.txt')
+  })
+
+  it('reader.style 返回副本, 修改面板草稿不会污染配置', () => {
+    const { confs } = setup()
+    const draft = readSettings(confs)
+    draft.reader.style.active = 'darcula'
+    draft.reader.style.customs.push({ id: 's1', name: '自定', css: '#content { color: red; }' })
+
+    expect(readSettings(confs).reader.style).toEqual({ active: 'default', customs: [] })
   })
 })

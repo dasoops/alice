@@ -11,9 +11,28 @@ import {
   validateSettings,
   type SettingsErrors
 } from '../lib/validateSettings'
+import {
+  readerStyleEntries,
+  readerStyleEntry,
+  type ReaderStyleCustom
+} from '../../../../shared/readerStyle'
 import type { SettingsData } from '../../../../main/popup/types'
 
 type ChapterRegexItem = SettingsData['reader']['txt']['chapterRegex'][number]
+
+// 自定义样式 id 只用于区分同名条目, 无持久语义
+function newStyleId(): string {
+  return `style-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+// 同名样式难以区分, 自动追加序号
+function uniqueStyleName(base: string, customs: ReaderStyleCustom[]): string {
+  const used = new Set(customs.map((it) => it.name))
+  if (!used.has(base)) return base
+  let index = 2
+  while (used.has(`${base} ${index}`)) index++
+  return `${base} ${index}`
+}
 
 export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Element {
   const [draft, setDraft0] = useState<SettingsData>(data)
@@ -36,7 +55,7 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
   const dirty = JSON.stringify(draft) !== JSON.stringify(originalRef.current)
 
   // errors 为唯一错误事实源, draft 变化后由 effect 驱动异步刷新
-  const [errors, setErrors] = useState<SettingsErrors>({ regex: [] })
+  const [errors, setErrors] = useState<SettingsErrors>({ regex: [], styleNames: [] })
   const validationRef = useRef<Promise<SettingsErrors>>(Promise.resolve(errors))
 
   useEffect(() => {
@@ -171,6 +190,63 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
       ...draft.reader.status,
       formats: next,
       formatIndex: nextIndex
+    })
+  }
+
+  const styleEntries = readerStyleEntries(draft.reader.style)
+  const activeStyle = readerStyleEntry(draft.reader.style)
+  const activeCustomIndex = draft.reader.style.customs.findIndex(
+    (it) => it.id === draft.reader.style.active
+  )
+  const activeCustom =
+    activeCustomIndex >= 0 ? draft.reader.style.customs[activeCustomIndex] : undefined
+
+  const selectStyle = (id: string): void => {
+    const style = draft.reader.style
+    // 名称输入框只在选中时出现, 切换前为空则补默认名, 避免留下无法定位的空标签
+    const customs = style.customs.map((it) =>
+      it.id === style.active && !it.name.trim()
+        ? { ...it, name: uniqueStyleName('自定义', style.customs) }
+        : it
+    )
+    setDraft('reader', 'style', { ...style, active: id, customs })
+  }
+
+  const addCustomStyle = (): void => {
+    const customs = draft.reader.style.customs
+    const custom: ReaderStyleCustom = {
+      id: newStyleId(),
+      name: uniqueStyleName('自定义', customs),
+      css: ''
+    }
+    setDraft('reader', 'style', { active: custom.id, customs: [...customs, custom] })
+  }
+
+  // 复制当前样式, 便于在现有 CSS 上修改
+  const copyStyleAsCustom = (): void => {
+    const customs = draft.reader.style.customs
+    const custom: ReaderStyleCustom = {
+      id: newStyleId(),
+      name: uniqueStyleName(`${activeStyle.name || '未命名'} 副本`, customs),
+      css: activeStyle.css
+    }
+    setDraft('reader', 'style', { active: custom.id, customs: [...customs, custom] })
+  }
+
+  const updateActiveCustom = (patch: Partial<Pick<ReaderStyleCustom, 'name' | 'css'>>): void => {
+    const style = draft.reader.style
+    setDraft('reader', 'style', {
+      ...style,
+      customs: style.customs.map((it) => (it.id === style.active ? { ...it, ...patch } : it))
+    })
+  }
+
+  const removeActiveCustom = (): void => {
+    const style = draft.reader.style
+    // 删除启用项后回到默认样式, 避免 active 指向不存在的 id
+    setDraft('reader', 'style', {
+      active: 'default',
+      customs: style.customs.filter((it) => it.id !== style.active)
     })
   }
 
@@ -310,6 +386,71 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
           </div>
         </div>
 
+        <div className={styles.sect}>正文样式</div>
+
+        <div className={styles.row}>
+          <span className={styles['row-key']}>样式</span>
+          <div className={`${styles['radio-group']} ${styles['style-group']}`}>
+            {styleEntries.map((option) => (
+              <label className={styles.radio} key={option.id}>
+                <input
+                  type="radio"
+                  name="readerStyle"
+                  checked={draft.reader.style.active === option.id}
+                  onChange={() => selectStyle(option.id)}
+                />
+                <span className={styles['radio-mark']} />
+                <span>{option.name || '未命名'}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {activeCustom && (
+          <label className={styles.row}>
+            <span className={styles['row-key']}>样式名称</span>
+            <input
+              className={`${shared.input} ${shared['input-flex']}${
+                errors.styleNames[activeCustomIndex] ? ` ${shared['is-invalid']}` : ''
+              }`}
+              type="text"
+              value={activeCustom.name}
+              ref={registerField(`styleName:${activeCustomIndex}`)}
+              onChange={(event) => updateActiveCustom({ name: event.target.value })}
+            />
+          </label>
+        )}
+
+        <div className={`${styles.row} ${styles['row-block']}`}>
+          <span className={styles['row-key']}>CSS</span>
+          <div className={styles['css-editor']}>
+            <textarea
+              className={`${shared.input} ${shared['is-mono']} ${styles['css-textarea']}`}
+              aria-label="正文 CSS"
+              value={activeStyle.css}
+              readOnly={!activeCustom}
+              spellCheck={false}
+              onChange={(event) => updateActiveCustom({ css: event.target.value })}
+            />
+            <div className={styles['css-bar']}>
+              <button className={shared['link-btn']} onClick={addCustomStyle}>
+                + 新建
+              </button>
+              <button className={shared['link-btn']} onClick={copyStyleAsCustom}>
+                复制为自定义
+              </button>
+              {activeCustom && (
+                <button
+                  className={`${shared['link-btn']} ${shared['link-danger']}`}
+                  onClick={removeActiveCustom}
+                >
+                  删除
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className={styles.sect}>阅读进度</div>
 
         <div className={styles.row}>
@@ -348,7 +489,7 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
         </div>
 
         <div className={styles.row}>
-          <span className={styles['row-key']}>样式</span>
+          <span className={styles['row-key']}>角标样式</span>
           <div className={styles['radio-group']}>
             {statusStyleOptions.map((option) => (
               <label className={styles.radio} key={option.value}>

@@ -1,5 +1,6 @@
 import log from 'electron-log/renderer'
-import type { ReaderStatus, StatusConfig } from '../../main/reader'
+import type { ReaderStatus, ReaderStyle, StatusConfig } from '../../main/reader'
+import { readerStyleCss } from '../../shared/readerStyle'
 import { renderStatusTemplate } from './lib/statusTemplate'
 
 const api = window.api
@@ -7,6 +8,17 @@ const br = '<br />'
 
 let statusConfig: StatusConfig | undefined
 let statusProgress: ReaderStatus['progress']
+
+// 复用同一个 style 节点, 重复应用只替换内容, 避免堆积
+function applyStyle(style: ReaderStyle): void {
+  let styleEl = document.getElementById('reader-style') as HTMLStyleElement | null
+  if (!styleEl) {
+    styleEl = document.createElement('style')
+    styleEl.id = 'reader-style'
+    document.head.appendChild(styleEl)
+  }
+  styleEl.textContent = readerStyleCss(style)
+}
 
 function renderStatus(): void {
   const status = document.getElementById('status')!
@@ -109,6 +121,10 @@ async function init0(): Promise<void> {
     log.debug('ipcRenderer <== status-config')
     applyStatusConfig(config)
   })
+  ipcRenderer.on('style-config', (_event, style: ReaderStyle) => {
+    log.debug('ipcRenderer <== style-config')
+    applyStyle(style)
+  })
   ipcRenderer.on('paging-config', () => {
     log.debug('ipcRenderer <== paging-config')
     void changePage(0)
@@ -123,6 +139,12 @@ async function init0(): Promise<void> {
   })
   window.addEventListener('contextmenu', api.toggleDisplay)
 
+  // 样式先落地再渲染正文, 避免首屏按默认样式闪现
+  try {
+    applyStyle(await api.reader.style())
+  } catch (err) {
+    log.warn('读取阅读样式失败', err)
+  }
   await changePage(0)
 }
 

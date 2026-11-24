@@ -25,6 +25,10 @@ export function readSettings(confs: SettingsConfs): SettingsData {
       status: {
         ...reader.status,
         formats: [...reader.status.formats]
+      },
+      style: {
+        active: reader.style.active,
+        customs: reader.style.customs.map((item) => ({ ...item }))
       }
     },
     webdav: {

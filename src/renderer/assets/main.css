@@ -28,6 +28,8 @@ body {
   width: 100%;
   height: 100%;
   padding: 0;
+  /* 选中「默认」预设时会注入同样的排版规则(src/shared/styles/default.css),
+     修改字号/行高/配色需同步该文件, 运行时以注入值为准 */
   font-family: '微软雅黑', serif;
   font-size: 16px;
   line-height: 1.5;

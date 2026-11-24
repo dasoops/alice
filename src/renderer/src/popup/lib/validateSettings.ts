@@ -27,7 +27,7 @@ export const statusStyleOptions: {
   value: ReaderSettings['status']['style']
   label: string
 }[] = [
-  { value: 'plain', label: '正文' },
+  { value: 'plain', label: '跟随正文' },
   { value: 'badge', label: 'badge' }
 ]
 
@@ -38,6 +38,7 @@ export type SettingsErrors = {
   chunkSize?: string
   maxLine?: string
   regex: (string | undefined)[]
+  styleNames: (string | undefined)[]
   statusFormats?: string
   url?: string
   directory?: string
@@ -49,6 +50,10 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
   const required = (value: string): string | undefined => (value.trim() ? undefined : '不能为空')
   const { formats, formatIndex } = draft.reader.status
   const activeFormat = formats[formatIndex]
+  // 名称输入框只渲染当前样式, 非当前项无法编辑, 不参与校验以免永久阻塞保存
+  const activeStyleIndex = draft.reader.style.customs.findIndex(
+    (item) => item.id === draft.reader.style.active
+  )
   const errors: SettingsErrors = {
     file: required(draft.reader.file.trim()),
     chunkSize: positiveInt(draft.reader.chunkSize),
@@ -65,6 +70,9 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
       }
       return undefined
     }),
+    styleNames: draft.reader.style.customs.map((item, index) =>
+      index === activeStyleIndex && !item.name.trim() ? '不能为空' : undefined
+    ),
     statusFormats: !draft.reader.status.enabled
       ? undefined
       : formatIndex < 0 || formatIndex >= formats.length
@@ -97,6 +105,9 @@ export function errorList(errors: SettingsErrors): string[] {
   errors.regex.forEach((message, index) => {
     if (message) list.push(`阅读: 章节正则 #${index + 1}: ${message}`)
   })
+  errors.styleNames.forEach((message, index) => {
+    if (message) list.push(`阅读: 正文样式 #${index + 1}: 名称${message}`)
+  })
   return list
 }
 
@@ -106,6 +117,8 @@ export function firstErrorKey(errors: SettingsErrors): string {
   if (errors.maxLine) return 'maxLine'
   const regexIndex = errors.regex.findIndex((message) => message !== undefined)
   if (regexIndex >= 0) return `regex:${regexIndex}`
+  const styleIndex = errors.styleNames.findIndex((message) => message !== undefined)
+  if (styleIndex >= 0) return `styleName:${styleIndex}`
   if (errors.statusFormats) return 'statusFormats'
   if (errors.url) return 'url'
   return 'directory'

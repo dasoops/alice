@@ -5,6 +5,7 @@
     "src/renderer/**/*.tsx",
     "src/preload/*.d.ts",
     "src/main/popup/types.ts",
+    "src/shared/**/*.ts",
     "src/global.d.ts"
   ],
   "compilerOptions": {

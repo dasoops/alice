@@ -1,6 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf'
-import { Config, type ReadResult, type ReaderStatus } from '../main/reader/index'
+import { Config, type ReaderStyle, type ReadResult, type ReaderStatus } from '../main/reader/index'
 
 interface Api {
   toggleDisplay: () => void
@@ -8,6 +8,7 @@ interface Api {
     read: (offset: number) => Promise<ReadResult>
     fileName: () => Promise<string>
     status: () => Promise<ReaderStatus>
+    style: () => Promise<ReaderStyle>
   }
   conf: Conf<Config>
 }

@@ -147,6 +147,11 @@ export class Reader extends EventEmitter<ReaderEvents> {
     })
     ipcMain.handle('reader:fileName', (): string => path.basename(this.conf.get('file')))
     ipcMain.handle('reader:status', (): Promise<ReaderStatus> => this.status())
+    ipcMain.handle('reader:style', () => this.conf.get('style'))
+    // 设置面板修改正文样式后, 推送主窗口即时生效
+    this.conf.onDidChange('style', (style) => {
+      this.mainWindow.webContents.send('style-config', style)
+    })
     // 设置面板修改角标配置后, 推送主窗口即时更新位置/显隐
     this.conf.onDidChange('status', (status) => {
       this.mainWindow.webContents.send('status-config', status)

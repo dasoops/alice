@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf/renderer'
-import { Config, type ReadResult, type ReaderStatus } from '../main/reader'
+import { Config, type ReaderStyle, type ReadResult, type ReaderStatus } from '../main/reader'
 
 // Custom APIs for renderer
 const api = {
@@ -9,7 +9,8 @@ const api = {
   reader: {
     read: (offset: number): Promise<ReadResult> => ipcRenderer.invoke('reader:read', offset),
     fileName: (): Promise<string> => ipcRenderer.invoke('reader:fileName'),
-    status: (): Promise<ReaderStatus> => ipcRenderer.invoke('reader:status')
+    status: (): Promise<ReaderStatus> => ipcRenderer.invoke('reader:status'),
+    style: (): Promise<ReaderStyle> => ipcRenderer.invoke('reader:style')
   },
   conf: new Conf<Config>({ name: 'reader' })
 }
