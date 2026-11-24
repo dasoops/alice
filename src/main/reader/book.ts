@@ -23,6 +23,19 @@ export type Chapter = {
   legadoIndex?: number
 }
 
+// 卷是 chapters 的区间视图: 只存范围, 不复制章节数组;
+// 恒满足区间首尾相接并覆盖 [0, chapters.length)
+export type Volume = {
+  // 缺省表示目录层级之前的前置组(前言/封面等)
+  title?: string
+  // 卷首章节 index(该章计入范围)
+  head: number
+  // 在 chapters 中的起始下标(含)
+  start: number
+  // 结束下标(不含)
+  end: number
+}
+
 // 阅读角标所需的进度: percent 为全书已读字符占比 [0, 1];
 // page/pageTotal 在展示格式不需要页码时省略, 避免大文本做无用的整章分页
 export type ReadingProgress = {
@@ -51,6 +64,7 @@ export interface Book extends EventEmitter<BookEvents> {
   readonly name: string
   readonly author: string
   readonly chapters: Chapter[]
+  readonly volumes: Volume[]
   position(): Position
   setPosition(pos: Position, options?: PageOptions): void
   chapter(): Chapter

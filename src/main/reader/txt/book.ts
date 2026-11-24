@@ -7,7 +7,8 @@ import type {
   PageOptions,
   PageRead,
   Position,
-  ReadingProgress
+  ReadingProgress,
+  Volume
 } from '../book'
 import { nextPage, pageRange } from '../paging'
 import { ChapterPageIndex } from '../pageIndex'
@@ -21,6 +22,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   readonly content: string
 
   readonly chapters: TxtChapter[]
+  readonly volumes: Volume[]
   private index = 0
 
   private _chapter: TxtChapter
@@ -30,18 +32,22 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     filePath,
     name,
     content,
-    chapters
+    chapters,
+    // txt 无目录层级, 默认退化为单个无标题卷
+    volumes = [{ head: chapters[0]?.index ?? 0, start: 0, end: chapters.length }]
   }: {
     filePath: string
     name: string
     content: string
     chapters: TxtChapter[]
+    volumes?: Volume[]
   }) {
     super()
     this.path = filePath
     this.name = name
     this.content = content
     this.chapters = chapters
+    this.volumes = volumes
     if (chapters.length === 0) throw Error('txt 章节表为空')
     this._chapter = chapters[0]
   }

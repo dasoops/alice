@@ -51,13 +51,13 @@ export type PopupChapterOptions = {
   current: number
 }
 
-// 章节选择按卷分组: title/head 只有可识别的卷首章节组才有;
-// chapters 含卷首章节本身, collapsible 由主进程按组内章节数判定
+// 章节选择按卷分组: 分组由 parser 层按目录结构给出;
+// head 为卷首章节 index, 无 title 表示目录层级之前的前置组;
+// 是否可折叠属于展示策略, 由渲染层按组内章节数判定
 export type PopupChapterGroup = {
   title?: string
-  head?: number
+  head: number
   chapters: PopupChapter[]
-  collapsible: boolean
 }
 
 // 设置面板的 reader 契约, 与本地配置的可编辑字段同构

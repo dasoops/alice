@@ -13,6 +13,11 @@ type Row =
 
 const EMPTY_EXPANDED: ReadonlySet<number> = new Set()
 
+// 与 parser 层的卷结构解耦: 卷是否可折叠只由展示层按组内章节数决定
+const MIN_COLLAPSIBLE_SIZE = 3
+const isCollapsible = (group: PopupChapterGroup): boolean =>
+  group.title !== undefined && group.chapters.length >= MIN_COLLAPSIBLE_SIZE
+
 const chapterKey = (index: number): string => `c:${index}`
 const volumeKey = (head: number): string => `v:${head}`
 
@@ -29,7 +34,7 @@ function locateChapter(
   expanded: ReadonlySet<number>
 ): string {
   for (const group of groups) {
-    if (group.title === undefined || !group.collapsible || group.head === undefined) continue
+    if (!isCollapsible(group)) continue
     if (!group.chapters.some((chapter) => chapter.index === index)) continue
     return expanded.has(group.head) ? chapterKey(index) : volumeKey(group.head)
   }
@@ -39,12 +44,9 @@ function locateChapter(
 // 打开时只展开当前章所在卷, 保证默认定位到当前章节; 其余卷仍默认折叠
 function expandCurrentVolume(current: number, groups: PopupChapterGroup[]): ReadonlySet<number> {
   const group = groups.find(
-    (item) =>
-      item.collapsible &&
-      item.head !== undefined &&
-      item.chapters.some((chapter) => chapter.index === current)
+    (item) => isCollapsible(item) && item.chapters.some((chapter) => chapter.index === current)
   )
-  return group && group.head !== undefined ? new Set([group.head]) : EMPTY_EXPANDED
+  return group ? new Set([group.head]) : EMPTY_EXPANDED
 }
 
 export function ChapterPanel({
@@ -90,7 +92,7 @@ export function ChapterPanel({
     }
     const result: Row[] = []
     for (const group of groups) {
-      if (group.title === undefined || !group.collapsible || group.head === undefined) {
+      if (!isCollapsible(group)) {
         for (const chapter of group.chapters) {
           result.push({ kind: 'chapter', key: chapterKey(chapter.index), chapter })
         }

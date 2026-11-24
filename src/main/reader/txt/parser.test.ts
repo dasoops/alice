@@ -61,6 +61,20 @@ describe('Parser', () => {
     expect((parsed as Book).content).toBe('只有正文')
   })
 
+  it('txt 不做卷分组, 全部章节装入单个无标题卷', async () => {
+    const filePath = write('分卷.txt', '第一卷 起\n第1章 A\n第2章 B\n第二卷 承\n第3章 C')
+    const parsed = await new Parser(filePath, {
+      chapterRegex: [
+        { pattern: '^\\s*(?:第\\s*\\d+\\s*章|第\\s*[一二三四五六七八九十]+\\s*卷)', enabled: true }
+      ]
+    }).parse()
+
+    // 章节标题虽像卷, txt 无目录结构, 由 popup 平铺展示
+    expect(parsed.volumes).toHaveLength(1)
+    expect(parsed.volumes[0]).toMatchObject({ head: 0, start: 0, end: parsed.chapters.length })
+    expect(parsed.volumes[0]).not.toHaveProperty('title')
+  })
+
   it('关闭的正则不参与章节匹配', async () => {
     const filePath = write('关闭正则.txt', '第1章 开始\r\n正文')
     const parsed = await new Parser(filePath, {

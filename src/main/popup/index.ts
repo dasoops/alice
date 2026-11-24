@@ -4,9 +4,9 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { readSettings, type SettingsConfs } from './schema'
-import { buildChapterGroups } from './volumes'
 import { configDir } from '../util'
 import type {
+  PopupChapterGroup,
   PopupChapterOptions,
   PopupInit,
   PopupMessageOptions,
@@ -56,14 +56,12 @@ export class PopupManager {
     return this.open<void>({ mode: 'settings', options, data: readSettings(this.confs) }, undefined)
   }
 
-  // 章节选择面板; 返回选中章节 index, 失焦/取消返回 null
-  public chapters(options: PopupChapterOptions): Promise<number | null> {
-    // 卷分组为纯函数结果, 与 options 一并下发渲染进程
-    return this.open<number | null>(
-      { mode: 'chapter', options, groups: buildChapterGroups(options.chapters) },
-      null,
-      true
-    )
+  // 章节选择面板; groups 由 book.volumes 投影, 返回选中章节 index, 失焦/取消返回 null
+  public chapters(
+    options: PopupChapterOptions,
+    groups: PopupChapterGroup[]
+  ): Promise<number | null> {
+    return this.open<number | null>({ mode: 'chapter', options, groups }, null, true)
   }
 
   public dispose(): void {

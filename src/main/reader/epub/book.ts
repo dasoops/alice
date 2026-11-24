@@ -6,7 +6,8 @@ import type {
   PageOptions,
   PageRead,
   Position,
-  ReadingProgress
+  ReadingProgress,
+  Volume
 } from '../book'
 import { nextPage, pageRange } from '../paging'
 import { ChapterPageIndex } from '../pageIndex'
@@ -23,6 +24,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   readonly name: string
   readonly author: string
   readonly chapters: EpubChapter[]
+  readonly volumes: Volume[]
 
   private chapterIndex = 0
   private chapterPos = 0
@@ -36,18 +38,22 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     filePath,
     name,
     author,
-    chapters
+    chapters,
+    // 直接构造时无目录层级, 退化为单个无标题卷; 正式解析由 parser 按 nav 层级给出
+    volumes = [{ head: chapters[0]?.index ?? 0, start: 0, end: chapters.length }]
   }: {
     filePath: string
     name: string
     author: string
     chapters: EpubChapter[]
+    volumes?: Volume[]
   }) {
     super()
     this.path = filePath
     this.name = name
     this.author = author
     this.chapters = chapters
+    this.volumes = volumes
     if (chapters.length === 0) throw Error('epub 章节表为空')
     this._chapter = chapters[0]
 

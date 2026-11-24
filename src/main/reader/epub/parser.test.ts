@@ -32,11 +32,13 @@ const defaultSpine: FakeSpineItem[] = [
 ]
 
 // 以 spine/toc/章节 html 构造假 EpubFile, 避免测试依赖真实 epub 文件;
-// manifest/resolveHref 按 spine href 派生, 供 adapter 的 legado 章节表换算使用
+// manifest/resolveHref 按 spine href 派生, 供 adapter 的 legado 章节表换算使用;
+// navToc 缺省同 toc, 用于区分"读平铺目录"与"读带层级 nav"两条分卷路径
 function fakeEpub(
   htmlById: Record<string, string>,
   toc: EpubToc = [],
-  spine: FakeSpineItem[] = defaultSpine
+  spine: FakeSpineItem[] = defaultSpine,
+  navToc: EpubToc = toc
 ): EpubFile {
   const manifest: Record<string, ManifestItem> = {}
   const baseToId = new Map<string, string>()
@@ -55,6 +57,7 @@ function fakeEpub(
         ...(item.linear ? { linear: item.linear } : {})
       })),
     getToc: () => toc,
+    getNavToc: () => navToc,
     getGuide: () => [],
     loadChapter: async (id: string) => {
       const html = htmlById[id]
@@ -142,6 +145,137 @@ describe('Parser', () => {
     // legado 侧: 卷首页 front=0, 第一章=1, 第二章=2; 本地仅展示正文两章
     expect(book.chapters.map((it) => it.title)).toEqual(['第一章', '第二章'])
     expect(book.chapters.map((it) => it.legadoIndex)).toEqual([1, 2])
+  })
+
+  it('nav 有层级时按卷分组, 卷末感言归入所属卷且 volumes 覆盖 chapters', async () => {
+    const navToc: EpubToc = [
+      {
+        label: '第一卷 起',
+        href: '',
+        id: '',
+        playOrder: '1',
+        children: [
+          { label: '第一章', href: 'epub:Text/chap1.xhtml', id: 'c1', playOrder: '1' },
+          { label: '第二章', href: 'epub:Text/chap2.xhtml', id: 'c2', playOrder: '2' }
+        ]
+      },
+      {
+        label: '第二卷 承',
+        href: '',
+        id: '',
+        playOrder: '2',
+        children: [
+          { label: '第三章', href: 'epub:Text/chap3.xhtml', id: 'c3', playOrder: '3' },
+          { label: '第一卷 卷末感言', href: 'epub:Text/chap4.xhtml', id: 'c4', playOrder: '4' }
+        ]
+      }
+    ]
+    const epub = fakeEpub(
+      {
+        c1: '<html><body><p>一</p></body></html>',
+        c2: '<html><body><p>二</p></body></html>',
+        c3: '<html><body><p>三</p></body></html>',
+        c4: '<html><body><p>感言</p></body></html>'
+      },
+      navToc,
+      [
+        { id: 'c1', href: 'Text/chap1.xhtml' },
+        { id: 'c2', href: 'Text/chap2.xhtml' },
+        { id: 'c3', href: 'Text/chap3.xhtml' },
+        { id: 'c4', href: 'Text/chap4.xhtml' }
+      ],
+      navToc
+    )
+    initEpubFileMock.mockResolvedValue(epub)
+
+    const book = (await new Parser(path.join(dir, 'a.epub'), path.join(dir, 'res')).parse()) as Book
+
+    expect(book.volumes.map((it) => it.title)).toEqual(['第一卷 起', '第二卷 承'])
+    expect(book.volumes.map((it) => it.head)).toEqual([0, 2])
+    expect(book.volumes.map((it) => it.end - it.start)).toEqual([2, 2])
+    // 卷末感言标题以"第一卷"开头, 但属第二卷正文, 不应另起一卷
+    const second = book.volumes[1]
+    expect(book.chapters.slice(second.start, second.end).map((it) => it.title)).toEqual([
+      '第三章',
+      '第一卷 卷末感言'
+    ])
+    const flat = book.volumes.flatMap((volume) => book.chapters.slice(volume.start, volume.end))
+    expect(flat).toHaveLength(book.chapters.length)
+    flat.forEach((chapter, i) => expect(chapter).toBe(book.chapters[i]))
+  })
+
+  it('导航文档平铺时保持不分组(标题像卷也不猜)', async () => {
+    const toc: EpubToc = [
+      { label: '第一卷 起', href: 'epub:Text/v1.xhtml', id: 'v1', playOrder: '1' },
+      { label: '第一章', href: 'epub:Text/chap1.xhtml', id: 'c1', playOrder: '2' },
+      { label: '第二章', href: 'epub:Text/chap2.xhtml', id: 'c2', playOrder: '3' },
+      { label: '第二卷 承', href: 'epub:Text/v2.xhtml', id: 'v2', playOrder: '4' },
+      { label: '第三章', href: 'epub:Text/chap3.xhtml', id: 'c3', playOrder: '5' }
+    ]
+    const epub = fakeEpub(
+      {
+        v1: '<html><body><p>卷首页</p></body></html>',
+        c1: '<html><body><p>一</p></body></html>',
+        c2: '<html><body><p>二</p></body></html>',
+        v2: '<html><body><p>卷首页</p></body></html>',
+        c3: '<html><body><p>三</p></body></html>'
+      },
+      toc,
+      [
+        { id: 'v1', href: 'Text/v1.xhtml' },
+        { id: 'c1', href: 'Text/chap1.xhtml' },
+        { id: 'c2', href: 'Text/chap2.xhtml' },
+        { id: 'v2', href: 'Text/v2.xhtml' },
+        { id: 'c3', href: 'Text/chap3.xhtml' }
+      ]
+    )
+    initEpubFileMock.mockResolvedValue(epub)
+
+    const book = (await new Parser(path.join(dir, 'a.epub'), path.join(dir, 'res')).parse()) as Book
+
+    // 章节标题虽以"第一卷/第二卷"开头, epub 平铺目录仍视为无卷结构, 由 popup 平铺展示
+    expect(book.volumes).toHaveLength(1)
+    expect(book.volumes[0]).toMatchObject({ head: 0, start: 0, end: book.chapters.length })
+    expect(book.volumes[0]).not.toHaveProperty('title')
+  })
+
+  it('无导航文档时单卷平铺, 不回退 NCX 层级', async () => {
+    // NCX(getToc) 即便有层级也不参与分卷: getNavToc 只返回 EPUB3 导航文档, 缺失时为空
+    const ncxToc: EpubToc = [
+      {
+        label: '第一卷 起',
+        href: '',
+        id: '',
+        playOrder: '1',
+        children: [{ label: '第一章', href: 'epub:Text/chap1.xhtml', id: 'c1', playOrder: '1' }]
+      },
+      {
+        label: '第二卷 承',
+        href: '',
+        id: '',
+        playOrder: '2',
+        children: [{ label: '第二章', href: 'epub:Text/chap2.xhtml', id: 'c2', playOrder: '2' }]
+      }
+    ]
+    const epub = fakeEpub(
+      {
+        c1: '<html><body><p>一</p></body></html>',
+        c2: '<html><body><p>二</p></body></html>'
+      },
+      ncxToc,
+      [
+        { id: 'c1', href: 'Text/chap1.xhtml' },
+        { id: 'c2', href: 'Text/chap2.xhtml' }
+      ],
+      []
+    )
+    initEpubFileMock.mockResolvedValue(epub)
+
+    const book = (await new Parser(path.join(dir, 'a.epub'), path.join(dir, 'res')).parse()) as Book
+
+    expect(book.volumes).toHaveLength(1)
+    expect(book.volumes[0]).toMatchObject({ head: 0, start: 0, end: book.chapters.length })
+    expect(book.volumes[0]).not.toHaveProperty('title')
   })
 })
 

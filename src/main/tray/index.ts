@@ -213,11 +213,22 @@ export class TrayManager {
 
     // 序号从 0 开始(含前言为 0), 与本地章节表 toc index 一致
     const current = Math.max((await this.reader.chapter()).index, 0)
-    const index = await this.popup.chapters({
-      bookName: book.name,
-      chapters: chapters.map((it) => ({ index: it.index, title: it.title })),
-      current
-    })
+    // 卷只存区间, 这里按范围切片并剥掉章节正文, 避免 EpubChapter.text 经 IPC 传到渲染进程
+    const groups = book.volumes.map((volume) => ({
+      title: volume.title,
+      head: volume.head,
+      chapters: chapters
+        .slice(volume.start, volume.end)
+        .map((it) => ({ index: it.index, title: it.title }))
+    }))
+    const index = await this.popup.chapters(
+      {
+        bookName: book.name,
+        chapters: chapters.map((it) => ({ index: it.index, title: it.title })),
+        current
+      },
+      groups
+    )
     if (index === null) return
     await this.reader.jumpChapter(index)
   }
