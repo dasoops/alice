@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog, Menu, shell, Tray } from 'electron'
 import icon from './../../../resources/icon.png?asset'
 import { Conf } from 'electron-conf'
-import { error } from '../util'
+import { configDir, error } from '../util'
 import { Reader } from '../reader'
 import type { Book } from '../reader'
 import { Config as WebDavConfig } from '../webdav'
@@ -115,10 +115,10 @@ export class TrayManager {
           click: () => this.reader.switchBook(file).then(null)
         }))
       },
-      { label: '打开阅读文件', click: () => this.openReadFile() },
-      { label: '打开阅读文件目录', click: () => this.openReadFileDir() },
+      { label: '打开阅读文件所在目录', click: () => this.openReadFileDir() },
       { type: 'separator' },
       { label: '设置', click: () => this.openSetting() },
+      { label: '打开配置文件目录', click: () => this.openConfigDir() },
       {
         type: 'checkbox',
         label: '鼠标点击穿透',
@@ -162,11 +162,6 @@ export class TrayManager {
     this.tray = undefined
   }
 
-  async openReadFile(): Promise<void> {
-    await this.initlization
-    await shell.openPath((await this.reader.book()).path)
-  }
-
   async openReadFileDir(): Promise<void> {
     await this.initlization
     await shell.openPath(path.dirname((await this.reader.book()).path))
@@ -175,6 +170,11 @@ export class TrayManager {
   async openSetting(): Promise<void> {
     await this.initlization
     await this.popup.settings()
+  }
+
+  async openConfigDir(): Promise<void> {
+    await this.initlization
+    await shell.openPath(configDir)
   }
 
   async showJumpDialog(): Promise<void> {
