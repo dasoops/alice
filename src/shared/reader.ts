@@ -11,7 +11,7 @@ export type Position = {
 export type SyncMode = 'approximate' | 'chapter'
 
 // 阅读角标所需的进度: percent 为全书已读字符占比 [0, 1];
-// page/pageTotal 在展示格式不需要页码时省略, 避免大文本做无用的整章分页
+// page/pageTotal 由渲染层按实际排版补齐, 主进程只负责章节与字符进度
 export type ReadingProgress = {
   chapterTitle: string
   page?: number
@@ -44,9 +44,6 @@ export type StatusConfig = {
 export type Config = {
   file: string
   position: Position
-  // 单页字符上限, 与 maxLine 先到为准; 防止超长段落撑爆窗口, 调小会掩盖 maxLine 的效果
-  chunkSize: number
-  maxLine: number
   txt: TxtConfig
   sync: { mode: SyncMode }
   // 阅读角标: 章节标题 / 本章页码 / 全书百分比
@@ -66,8 +63,13 @@ export type ReaderStatus = {
   progress?: ReadingProgress
 }
 
-// 翻页结果携带同一页算出的进度, 避免渲染层再请求一次 reader:status
-export type ReadResult = {
-  content: string
+// 渲染层分页所需的当前章节快照; 分页边界由渲染层按真实排版计算
+export type ChapterView = {
+  chapterIndex: number
+  chapterTitle: string
+  chapterCount: number
+  text: string
+  // 主进程持久化的章内字符位置, 渲染层以此为初始阅读锚点
+  chapterPos: number
   status: ReaderStatus
 }

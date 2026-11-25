@@ -35,8 +35,6 @@ export const statusStyleOptions: {
 // 校验保证值合法后, 提交前仅做 trim 清洗, 不再静默回退
 export type SettingsErrors = {
   file?: string
-  chunkSize?: string
-  maxLine?: string
   regex: (string | undefined)[]
   styleNames: (string | undefined)[]
   statusFormats?: string
@@ -45,8 +43,6 @@ export type SettingsErrors = {
 }
 
 export async function validateSettings(draft: SettingsData): Promise<SettingsErrors> {
-  const positiveInt = (value: number): string | undefined =>
-    value >= 1 && Number.isInteger(value) ? undefined : '需为大于 0 的整数'
   const required = (value: string): string | undefined => (value.trim() ? undefined : '不能为空')
   const { formats, formatIndex } = draft.reader.status
   const activeFormat = formats[formatIndex]
@@ -56,8 +52,6 @@ export async function validateSettings(draft: SettingsData): Promise<SettingsErr
   )
   const errors: SettingsErrors = {
     file: required(draft.reader.file.trim()),
-    chunkSize: positiveInt(draft.reader.chunkSize),
-    maxLine: positiveInt(draft.reader.maxLine),
     regex: draft.reader.txt.chapterRegex.map((item) => {
       // 关闭的规则不参与匹配, 非法内容不应阻塞保存
       if (!item.enabled) return undefined
@@ -97,8 +91,6 @@ export function errorList(errors: SettingsErrors): string[] {
     if (message) list.push(`${label}: ${message}`)
   }
   push(errors.file, '阅读: 阅读文件')
-  push(errors.chunkSize, '阅读: 单页字符上限')
-  push(errors.maxLine, '阅读: 每次展示行数')
   push(errors.statusFormats, '阅读进度: 格式')
   push(errors.url, 'WebDav 同步: 地址')
   push(errors.directory, 'WebDav 同步: 目录')
@@ -113,8 +105,6 @@ export function errorList(errors: SettingsErrors): string[] {
 
 export function firstErrorKey(errors: SettingsErrors): string {
   if (errors.file) return 'file'
-  if (errors.chunkSize) return 'chunkSize'
-  if (errors.maxLine) return 'maxLine'
   const regexIndex = errors.regex.findIndex((message) => message !== undefined)
   if (regexIndex >= 0) return `regex:${regexIndex}`
   const styleIndex = errors.styleNames.findIndex((message) => message !== undefined)

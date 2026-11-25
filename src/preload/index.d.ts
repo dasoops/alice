@@ -1,14 +1,19 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf'
-import type { Config, ReadResult, ReaderStatus } from '../shared/reader'
+import type { ChapterView, Config, ReaderStatus } from '../shared/reader'
 import type { ReaderStyle } from '../shared/readerStyle'
 
 interface Api {
   toggleDisplay: () => void
   reader: {
-    read: (offset: number) => Promise<ReadResult>
+    chapter: () => Promise<ChapterView>
+    moveChapter: (delta: -1 | 1) => Promise<ChapterView>
+    commitPosition: (
+      chapterIndex: number,
+      chapterPos: number,
+      pageEnd: number
+    ) => Promise<ReaderStatus>
     fileName: () => Promise<string>
-    status: () => Promise<ReaderStatus>
     style: () => Promise<ReaderStyle>
   }
   conf: Conf<Config>

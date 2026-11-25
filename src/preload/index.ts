@@ -1,16 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf/renderer'
-import type { Config, ReadResult, ReaderStatus } from '../shared/reader'
+import type { ChapterView, Config, ReaderStatus } from '../shared/reader'
 import type { ReaderStyle } from '../shared/readerStyle'
 
 // Custom APIs for renderer
 const api = {
   toggleDisplay: (): void => ipcRenderer.send('toggle-display'),
   reader: {
-    read: (offset: number): Promise<ReadResult> => ipcRenderer.invoke('reader:read', offset),
+    chapter: (): Promise<ChapterView> => ipcRenderer.invoke('reader:chapter'),
+    moveChapter: (delta: -1 | 1): Promise<ChapterView> =>
+      ipcRenderer.invoke('reader:moveChapter', delta),
+    commitPosition: (
+      chapterIndex: number,
+      chapterPos: number,
+      pageEnd: number
+    ): Promise<ReaderStatus> =>
+      ipcRenderer.invoke('reader:commitPosition', chapterIndex, chapterPos, pageEnd),
     fileName: (): Promise<string> => ipcRenderer.invoke('reader:fileName'),
-    status: (): Promise<ReaderStatus> => ipcRenderer.invoke('reader:status'),
     style: (): Promise<ReaderStyle> => ipcRenderer.invoke('reader:style')
   },
   conf: new Conf<Config>({ name: 'reader' })

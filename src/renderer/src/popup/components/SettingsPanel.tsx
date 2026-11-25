@@ -288,34 +288,6 @@ export function SettingsPanel({ data }: { data: SettingsData }): React.JSX.Eleme
           </button>
         </label>
 
-        <label className={styles.row}>
-          <span className={styles['row-key']}>单页字符上限</span>
-          <input
-            className={`${shared.input} ${styles['input-number']}${
-              errors.chunkSize ? ` ${shared['is-invalid']}` : ''
-            }`}
-            type="number"
-            min="1"
-            value={draft.reader.chunkSize}
-            ref={registerField('chunkSize')}
-            onChange={(event) => setDraft('reader', 'chunkSize', Number(event.target.value))}
-          />
-        </label>
-
-        <label className={styles.row}>
-          <span className={styles['row-key']}>每次展示行数</span>
-          <input
-            className={`${shared.input} ${styles['input-number']}${
-              errors.maxLine ? ` ${shared['is-invalid']}` : ''
-            }`}
-            type="number"
-            min="1"
-            value={draft.reader.maxLine}
-            ref={registerField('maxLine')}
-            onChange={(event) => setDraft('reader', 'maxLine', Number(event.target.value))}
-          />
-        </label>
-
         <div className={styles.row}>
           <span className={styles['row-key']}>同步粒度</span>
           <div className={styles['radio-group']}>

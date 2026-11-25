@@ -1,15 +1,9 @@
 import EventEmitter from 'node:events'
-import type { Position, ReadingProgress } from '../../shared/reader'
+import type { Position } from '../../shared/reader'
 
 export type { Position, ReadingProgress } from '../../shared/reader'
 
 export type BookType = 'txt' | 'epub'
-
-// 行分页参数, txt 作用于全文, epub 作用于章内
-export type PageOptions = {
-  maxLine: number
-  chunkSize: number
-}
 
 export type Chapter = {
   index: number
@@ -32,19 +26,14 @@ export type Volume = {
   end: number
 }
 
-// 一次翻页的结果; end 为当前页末尾位置, txt 为全文字符偏移, epub 为章内偏移
-export type PageRead = {
-  content: string
-  end: number
-}
-
 // 事件映射, 声明后 emit/on 参数受类型约束
 export type BookEvents = {
   // 跨章时 emit 'chapter'(current, previous)
   chapter: [current: Chapter, previous: Chapter | undefined]
 }
 
-// 当前章节由 book 内部随定位维护
+// 当前章节由 book 内部随定位维护; 分页由渲染层按实际排版完成,
+// 主进程只负责章节文本、字符位置与全书进度
 export interface Book extends EventEmitter<BookEvents> {
   readonly type: BookType
   readonly path: string
@@ -53,13 +42,13 @@ export interface Book extends EventEmitter<BookEvents> {
   readonly chapters: Chapter[]
   readonly volumes: Volume[]
   position(): Position
-  setPosition(pos: Position, options?: PageOptions): void
+  setPosition(pos: Position): void
   chapter(): Chapter
-  // 相对当前定位返回一页文本并推进定位; offset 为 0 时读取当前页
-  readPage(offset: number, options: PageOptions): PageRead
-  // 按当前分页参数计算本章页码与全书字符进度; pageEnd 已由 readPage 算出时传入以复用;
-  // withPageInfo 为 false 时跳过整章分页, 仅返回章节名与百分比
-  readingProgress(options: PageOptions, pageEnd?: number, withPageInfo?: boolean): ReadingProgress
+  chapterText(): string
+  // 章内位置对应的全书字符占比; 超出章范围时 clamp
+  percentAt(chapterPos: number): number
+  // 移动到相邻章节; 成功返回 true, 越界返回 false
+  moveChapter(delta: -1 | 1): boolean
   // lines / jumpLine txt 独有, 显式可选
   lines?(): { current: number; total: number }
   // 返回新定位或 undefined(行不存在)

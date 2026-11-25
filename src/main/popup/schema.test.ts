@@ -7,8 +7,6 @@ function setup(): { confs: SettingsConfs; readerStore: ReaderConfig } {
   const readerStore: ReaderConfig = {
     file: '/books/a.txt',
     position: { chapterIndex: 2, chapterPos: 10 },
-    chunkSize: 40,
-    maxLine: 1,
     txt: { chapterRegex: [{ pattern: '^第', enabled: true }] },
     sync: { mode: 'approximate' },
     status: {
@@ -66,14 +64,18 @@ describe('applySettings', () => {
     const { confs, readerStore } = setup()
     const applyReader = vi.fn().mockResolvedValue(undefined)
     const patch = readSettings(confs)
-    patch.reader = { ...patch.reader, file: '/books/b.txt', maxLine: 5 }
+    patch.reader = {
+      ...patch.reader,
+      file: '/books/b.txt',
+      status: { ...patch.reader.status, enabled: false }
+    }
 
     await applySettings(confs, { applySettings: applyReader }, patch)
 
     expect(readerStore.file).toBe('/books/a.txt')
     expect(readerStore.position).toEqual({ chapterIndex: 2, chapterPos: 10 })
     expect(readerStore.recent).toEqual(['/books/a.txt'])
-    expect(readerStore.maxLine).toBe(1)
+    expect(readerStore.status.enabled).toBe(true)
   })
 
   it('返回回读的真实配置: 切书失败回滚后不是提交值', async () => {

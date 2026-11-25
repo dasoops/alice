@@ -1,17 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { lineSeparator } from '../../constants'
-import type {
-  Book as BaseBook,
-  BookEvents,
-  Chapter,
-  PageOptions,
-  PageRead,
-  Position,
-  ReadingProgress,
-  Volume
-} from '../book'
-import { nextPage, pageRange } from '../paging'
-import { ChapterPageIndex } from '../pageIndex'
+import type { Book as BaseBook, BookEvents, Chapter, Position, Volume } from '../book'
 import { findChapterAt, type TxtChapter } from './toc'
 
 export class Book extends EventEmitter<BookEvents> implements BaseBook {
@@ -26,7 +15,6 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
   private index = 0
 
   private _chapter: TxtChapter
-  private readonly pageIndex = new ChapterPageIndex()
 
   constructor({
     filePath,
@@ -63,9 +51,7 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
       chapter = this.chapters.find((it) => it.index === chapter.index + 1) ?? chapter
     }
     const target = Math.min(chapter.beginChar + chapterPos, chapter.endChar)
-    // txt 分页连续覆盖全文, 章节内页起点与全局页边界不一定一致;
-    // 这里忽略 Reader 传入的分页参数, 保留原始字符偏移, 不按章节页网格回退,
-    // 避免跨端恢复时无谓改变阅读位置; 从非页首位置恢复时角标页码可能为近似值.
+    // 保留原始字符偏移, 由渲染层以该偏移为页首锚点
     this.index = Math.max(target, chapter.beginChar)
     this.syncChapter()
   }
@@ -74,11 +60,24 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
     return this._chapter
   }
 
-  readPage(offset: number, options: PageOptions): PageRead {
-    const { begin, end } = pageRange(this.content, this.index, offset, options)
-    this.index = begin
+  chapterText(): string {
+    return this.content.substring(this._chapter.beginChar, this._chapter.endChar)
+  }
+
+  percentAt(chapterPos: number): number {
+    if (this.content.length === 0) return 0
+    const length = this._chapter.endChar - this._chapter.beginChar
+    const pos = Math.min(Math.max(chapterPos, 0), length)
+    return (this._chapter.beginChar + pos) / this.content.length
+  }
+
+  moveChapter(delta: -1 | 1): boolean {
+    const target = this.chapters.find((it) => it.index === this._chapter.index + delta)
+    if (!target) return false
+    // 向前翻时停在章尾字符, 渲染层会据此选择上一章末页
+    this.index = delta > 0 ? target.beginChar : Math.max(target.beginChar, target.endChar - 1)
     this.syncChapter()
-    return { content: this.content.substring(begin, end), end }
+    return true
   }
 
   lines(): { current: number; total: number } {
@@ -86,46 +85,6 @@ export class Book extends EventEmitter<BookEvents> implements BaseBook {
       current: this.content.substring(0, this.index + 1).split(lineSeparator).length,
       total: this.content.split(lineSeparator).length
     }
-  }
-
-  readingProgress(options: PageOptions, pageEnd?: number, withPageInfo = true): ReadingProgress {
-    // 页起点可能是上一页末尾的换行符, 章节归属应按该页首个正文字符判断
-    const index = this.displayIndex()
-    const chapter = findChapterAt(this.chapters, index, this._chapter) ?? this._chapter
-    // 优先复用 readPage 返回的页尾, 单独请求进度时再按当前位置计算
-    const end = pageEnd ?? nextPage(this.content, this.index, 0, options)
-    const percent = this.content.length > 0 ? end / this.content.length : 0
-
-    if (!withPageInfo) return { chapterTitle: chapter.title, percent }
-
-    const { current, total } = this.pageIndex.info({
-      chapterIndex: chapter.index,
-      content: this.content,
-      from: chapter.beginChar,
-      end: this.contentEnd(chapter),
-      index,
-      options
-    })
-    return {
-      chapterTitle: chapter.title,
-      page: percent >= 1 ? total : current,
-      pageTotal: total,
-      percent
-    }
-  }
-
-  // 跳过页首换行符; 返回内容末尾时由 findChapterAt 归入末章
-  private displayIndex(): number {
-    let index = this.index
-    while (index < this.content.length && this.content[index] === lineSeparator) index++
-    return index
-  }
-
-  // 章节末尾的换行符属于下一页内容, 计页时不纳入本章
-  private contentEnd(chapter: TxtChapter): number {
-    let end = chapter.endChar
-    while (end > chapter.beginChar && this.content[end - 1] === lineSeparator) end--
-    return end
   }
 
   jumpLine(line: number): number | undefined {
