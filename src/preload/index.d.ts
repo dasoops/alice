@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf'
-import { Config, type ReaderStyle, type ReadResult, type ReaderStatus } from '../main/reader/index'
+import type { Config, ReadResult, ReaderStatus } from '../shared/reader'
+import type { ReaderStyle } from '../shared/readerStyle'
 
 interface Api {
   toggleDisplay: () => void

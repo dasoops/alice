@@ -1,5 +1,8 @@
 // https://github.com/HapeLee/legado-with-MD3/blob/1d69ec70d246b93867cba32db93ec5110511612e/app/src/main/java/io/legado/app/help/AppWebDav.kt
 // 根据 legado-with-MD3 AppWebDav 实现复刻, 保证 算法 / 结构 与其相同
+import type { SyncMode } from '../../../shared/reader'
+
+export type { SyncMode } from '../../../shared/reader'
 
 // 同步所需的最小书目信息
 export type BookMeta = {
@@ -14,9 +17,6 @@ export type BookProgress = BookMeta & {
   durChapterTime: number
   durChapterTitle: string
 }
-
-// approximate: 同步章内近似位置; chapter: 只同步章节信息(仅章节号, 章内位置恒为 0)
-export type SyncMode = 'approximate' | 'chapter'
 
 // 合并规则: approximate 按 (durChapterIndex, durChapterPos) 字典序比较, 与时间戳无关;
 // chapter 忽略 durChapterPos, 仅按章节号比较

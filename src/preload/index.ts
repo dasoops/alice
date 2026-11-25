@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { Conf } from 'electron-conf/renderer'
-import { Config, type ReaderStyle, type ReadResult, type ReaderStatus } from '../main/reader'
+import type { Config, ReadResult, ReaderStatus } from '../shared/reader'
+import type { ReaderStyle } from '../shared/readerStyle'
 
 // Custom APIs for renderer
 const api = {

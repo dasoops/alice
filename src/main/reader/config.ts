@@ -1,16 +1,18 @@
 import path from 'path'
 import { dataDir } from '../util'
-import type { ReaderStyle } from '../../shared/readerStyle'
-import type { Position } from './book'
-import type { SyncMode } from './sync/progress'
+import type { ChapterRegex, Config as SharedConfig, TxtConfig } from '../../shared/reader'
 
-export type ChapterRegex = {
-  pattern: string
-  // 关闭的规则保留但不参与匹配, 便于按书籍切换而无需反复增删
-  enabled: boolean
-}
+export type {
+  ChapterRegex,
+  ConfigPatch,
+  StatusConfig,
+  StatusCorner,
+  StatusStyle,
+  TxtConfig
+} from '../../shared/reader'
 
-export type TxtConfig = { chapterRegex: ChapterRegex[] }
+// 主进程侧沿用 Config 同名承载类型与默认值, 调用方按值/类型使用都无需改 import
+export type Config = SharedConfig
 
 type StoredTxtConfig = { chapterRegex?: (string | ChapterRegex)[] }
 
@@ -22,39 +24,6 @@ export function normalizeTxtConfig(stored: StoredTxtConfig | undefined): TxtConf
     )
   }
 }
-
-export type StatusCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-
-// plain: 同正文样式(字号小 2px, 无背景); badge: 独立样式(带背景角标)
-export type StatusStyle = 'plain' | 'badge'
-
-export type StatusConfig = {
-  enabled: boolean
-  corner: StatusCorner
-  style: StatusStyle
-  // 可选格式列表, formatIndex 指向当前启用项
-  formats: string[]
-  formatIndex: number
-}
-
-export type Config = {
-  file: string
-  position: Position
-  // 单页字符上限, 与 maxLine 先到为准; 防止超长段落撑爆窗口, 调小会掩盖 maxLine 的效果
-  chunkSize: number
-  maxLine: number
-  txt: TxtConfig
-  sync: { mode: SyncMode }
-  // 阅读角标: 章节标题 / 本章页码 / 全书百分比
-  status: StatusConfig
-  // 正文样式: 内置预设或自定义 CSS, 由主窗口注入 #content / #status.is-plain
-  style: ReaderStyle
-  // 最近打开的文件绝对路径, 按时间倒序, 运行时状态不进入设置契约
-  recent: string[]
-}
-
-// 设置面板可编辑的部分; position/recent 为运行状态, 由 Reader 自行维护
-export type ConfigPatch = Omit<Config, 'position' | 'recent'>
 
 export const Config: { Default: Config } = {
   Default: {

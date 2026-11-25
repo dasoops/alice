@@ -1,9 +1,11 @@
 import { Conf } from 'electron-conf'
 import log from 'electron-log/main'
 import { globalShortcut } from 'electron'
+import type { Config as SharedConfig, ShortcutKeys } from '../../shared/shortcut'
 
-type ShortcutKeys = 'toggleDisplay' | 'toggleLock' | 'prevPage' | 'nextPage' | 'exit'
-export type Config = Record<ShortcutKeys, string[]>
+// 主进程侧沿用 Config 同名承载类型与默认值, 调用方按值/类型使用都无需改 import
+export type Config = SharedConfig
+
 export const Config: { Default: Config } = {
   Default: {
     toggleDisplay: ['Ctrl+Q'],

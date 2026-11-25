@@ -1,14 +1,10 @@
 import { net } from 'electron'
 import { Conf } from 'electron-conf'
 import log from 'electron-log/main'
+import type { Config as SharedConfig } from '../../shared/webdav'
 
-export type Config = {
-  enabled: boolean
-  url: string
-  username: string
-  password: string
-  directory: string
-}
+// 主进程侧沿用 Config 同名承载类型与默认值, 调用方按值/类型使用都无需改 import
+export type Config = SharedConfig
 
 export const Config: { Default: Config } = {
   Default: { enabled: false, url: '', username: '', password: '', directory: 'legado' }

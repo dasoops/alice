@@ -5,14 +5,17 @@ import { error } from '../util'
 import { PathLike } from 'node:fs'
 import log from 'electron-log/main'
 import { BrowserWindow, ipcMain } from 'electron'
-import type { Book, BookEvents, Chapter, PageOptions, ReadingProgress } from './book'
+import type { Book, BookEvents, Chapter, PageOptions } from './book'
 import { createParser } from './parser'
 import { WebDavClient } from '../webdav'
 import { ProgressSync, type SyncTrigger } from './sync/sync'
 import { compareProgress, type BookProgress, type SyncMode } from './sync/progress'
 import EventEmitter from 'node:events'
-import { Config, type ConfigPatch, type StatusConfig } from './config'
+import { Config, type ConfigPatch } from './config'
 import type { PopupManager } from '../popup'
+import type { ReadResult, ReaderStatus } from '../../shared/reader'
+
+export type { ReadResult, ReaderStatus } from '../../shared/reader'
 
 // 最近阅读保留的最大条数
 const maxRecent = 10
@@ -21,18 +24,6 @@ const maxRecent = 10
 export type ReaderEvents = BookEvents & {
   // 书籍切换成功, 供托盘重建最近阅读菜单
   book: []
-}
-
-// 阅读角标数据; 开关关闭时不计算进度, 仅回传配置
-export type ReaderStatus = {
-  config: StatusConfig
-  progress?: ReadingProgress
-}
-
-// 翻页结果携带同一页算出的进度, 避免渲染层再请求一次 reader:status
-export type ReadResult = {
-  content: string
-  status: ReaderStatus
 }
 
 export class Reader extends EventEmitter<ReaderEvents> {

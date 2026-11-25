@@ -1,6 +1,6 @@
-import type { ConfigPatch } from '../reader'
-import type { Config as WebDavConfig } from '../webdav'
-import type { Config as ShortcutConfig } from '../shortcut'
+import type { ConfigPatch } from '../../shared/reader'
+import type { Config as WebDavConfig } from '../../shared/webdav'
+import type { Config as ShortcutConfig } from '../../shared/shortcut'
 
 export type PopupMode = 'message' | 'prompt' | 'settings' | 'chapter'
 

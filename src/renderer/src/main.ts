@@ -1,6 +1,6 @@
 import log from 'electron-log/renderer'
-import type { ReaderStatus, ReaderStyle, StatusConfig } from '../../main/reader'
-import { readerStyleCss } from '../../shared/readerStyle'
+import type { ReaderStatus, StatusConfig } from '../../shared/reader'
+import { readerStyleCss, type ReaderStyle } from '../../shared/readerStyle'
 import { renderStatusTemplate } from './lib/statusTemplate'
 
 const api = window.api

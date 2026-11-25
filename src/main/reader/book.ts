@@ -1,13 +1,9 @@
 import EventEmitter from 'node:events'
+import type { Position, ReadingProgress } from '../../shared/reader'
+
+export type { Position, ReadingProgress } from '../../shared/reader'
 
 export type BookType = 'txt' | 'epub'
-
-// 跨格式统一阅读定位, 与 legado BookProgress(durChapterIndex/durChapterPos) 同构;
-// 全局字符 index 等格式内部实现细节不进入共享抽象
-export type Position = {
-  chapterIndex: number
-  chapterPos: number
-}
 
 // 行分页参数, txt 作用于全文, epub 作用于章内
 export type PageOptions = {
@@ -34,15 +30,6 @@ export type Volume = {
   start: number
   // 结束下标(不含)
   end: number
-}
-
-// 阅读角标所需的进度: percent 为全书已读字符占比 [0, 1];
-// page/pageTotal 在展示格式不需要页码时省略, 避免大文本做无用的整章分页
-export type ReadingProgress = {
-  chapterTitle: string
-  page?: number
-  pageTotal?: number
-  percent: number
 }
 
 // 一次翻页的结果; end 为当前页末尾位置, txt 为全文字符偏移, epub 为章内偏移
